@@ -26,6 +26,7 @@ lib/Lit/ShLex.pm
 lib/Lit/ShRun.pm
 lib/Lit/Test.pm
 lib/Lit/TestRunner.pm
+LICENSE.md
 Makefile.PL
 MANIFEST
 MANIFEST.SKIP

@@ -126,6 +126,15 @@ Control the input dump printed on failure.
 0 when every directive matched, 1 when one did not, and 2 for a usage
 error or an unreadable file.
 
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (c) 2026 Endless Software Solutions
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself: either the GNU General Public
+License version 1 (or, at your option, any later version), or the
+Artistic License.  See F<LICENSE.md> for the full text of both.
+
 =head1 SEE ALSO
 
 L<Lit>, L<lit.pl>, L<https://llvm.org/docs/CommandGuide/FileCheck.html>

@@ -91,8 +91,13 @@ configuration objects, test discovery, script execution and reporting.
 L<https://llvm.org/docs/CommandGuide/lit.html>,
 L<https://llvm.org/docs/CommandGuide/FileCheck.html>
 
-=head1 LICENSE
+=head1 COPYRIGHT AND LICENSE
 
-Same terms as Perl itself.
+Copyright (c) 2026 Endless Software Solutions
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself: either the GNU General Public
+License version 1 (or, at your option, any later version), or the
+Artistic License.  See F<LICENSE.md> for the full text of both.
 
 =cut

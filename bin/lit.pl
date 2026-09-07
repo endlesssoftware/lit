@@ -118,6 +118,15 @@ Write JUnit XML results to I<FILE>.
 0 if every test passed or failed as expected, 1 if any test failed, and 2
 for a usage or discovery error.
 
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (c) 2026 Endless Software Solutions
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself: either the GNU General Public
+License version 1 (or, at your option, any later version), or the
+Artistic License.  See F<LICENSE.md> for the full text of both.
+
 =head1 SEE ALSO
 
 L<Lit>, L<filecheck.pl>, L<https://llvm.org/docs/CommandGuide/lit.html>
