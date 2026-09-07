@@ -1,0 +1,9 @@
+; REQUIRES/UNSUPPORTED/XFAIL take boolean expressions over the suite's
+; features.  'demo-feature' comes from lit.cfg; the host features come for
+; free.
+;
+; REQUIRES: demo-feature
+; UNSUPPORTED: no-such-feature
+;
+; RUN: %greet | FileCheck %s
+; CHECK: hello from the demo suite

@@ -1,0 +1,55 @@
+# Makefile.PL for Lit - portable lit / FileCheck in Perl.
+#
+# Usage:
+#   Unix/Tru64:  perl Makefile.PL && make && make test && make install
+#   OpenVMS:     PERL MAKEFILE.PL
+#                MMK        (or MMS, or MAKE)
+#                MMK TEST
+#                MMK INSTALL
+#
+# Written against the old ExtUtils::MakeMaker API so that it works with the
+# MakeMaker shipped with Perl 5.8 on OpenVMS VAX; newer keys are added only
+# when the installed MakeMaker is known to understand them.
+
+use strict;
+use ExtUtils::MakeMaker;
+
+my $mm = eval { $ExtUtils::MakeMaker::VERSION } || 0;
+$mm =~ s/_//g;
+
+my %args = (
+    NAME          => 'Lit',
+    VERSION_FROM  => 'lib/Lit.pm',
+    ABSTRACT      => 'Portable Perl reimplementation of LLVM lit and FileCheck',
+    AUTHOR        => 'Tim Sneddon <tim.sneddon@es.solutions>',
+    EXE_FILES     => [ 'bin/lit.pl', 'bin/filecheck.pl' ],
+    PL_FILES      => {},
+    PREREQ_PM     => {},          # core modules only, by design
+    dist          => { COMPRESS => 'gzip -9f', SUFFIX => 'gz' },
+    clean         => { FILES => 'Lit-0.[0-9]* t/tmp examples/demo/_out' },
+);
+
+# MIN_PERL_VERSION arrived in 6.48; LICENSE in 6.31.
+$args{MIN_PERL_VERSION} = '5.006' if $mm >= 6.48;
+$args{LICENSE}          = 'perl'  if $mm >= 6.31;
+
+if ($mm >= 6.64) {
+    $args{TEST_REQUIRES}      = { 'Test::More' => 0 };
+    $args{CONFIGURE_REQUIRES} = { 'ExtUtils::MakeMaker' => 0 };
+}
+elsif ($mm >= 6.55) {
+    $args{BUILD_REQUIRES}     = { 'Test::More' => 0 };
+}
+else {
+    $args{PREREQ_PM}{'Test::More'} = 0;
+}
+
+if ($mm >= 6.46) {
+    $args{META_MERGE} = {
+        'meta-spec' => { version => 2 },
+        resources   => {},
+        no_index    => { directory => [ 't', 'examples' ] },
+    };
+}
+
+WriteMakefile(%args);

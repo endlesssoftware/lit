@@ -1,0 +1,10 @@
+/Makefile
+/Makefile.old
+/Descrip.MMS
+/blib/
+/pm_to_blib
+/MYMETA.*
+/MANIFEST.bak
+/Lit-*
+*.tar.gz
+examples/demo/_out/

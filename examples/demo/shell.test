@@ -1,0 +1,18 @@
+; The internal shell: pipelines, redirection, control operators and the
+; builtin commands.  None of this needs /bin/sh, so it behaves the same
+; under DCL.
+;
+; RUN: echo one   > %t.txt
+; RUN: echo two  >> %t.txt
+; RUN: sort %t.txt | uniq | FileCheck --check-prefix=SORTED %s
+; RUN: not grep three %t.txt
+; RUN: test -f %t.txt && echo present | FileCheck --check-prefix=EXISTS %s
+;
+; A RUN line ending in a backslash continues onto the next one:
+; RUN: echo continued \
+; RUN:   across two lines | FileCheck --check-prefix=JOINED %s
+
+; SORTED:      one
+; SORTED-NEXT: two
+; EXISTS:      present
+; JOINED:      continued across two lines

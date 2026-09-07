@@ -1,0 +1,5 @@
+; A test known to fail is marked XFAIL, and reports XFAIL rather than FAIL.
+; If it ever starts passing, lit reports XPASS so you notice.
+;
+; XFAIL: *
+; RUN: false

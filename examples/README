@@ -1,0 +1,11 @@
+demo/            A small but complete suite.  Run it with:
+
+                     perl ../bin/lit.pl -v demo
+
+                 One test (expected-failure.test) is marked XFAIL on
+                 purpose, so a clean run reports 5 passed and 1
+                 expectedly failed.
+
+openvms-lit.cfg  An annotated suite config for a compiler test suite on
+                 OpenVMS, showing --param, native path substitutions and
+                 the host-provided architecture features.

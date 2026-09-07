@@ -1,0 +1,10 @@
+; Most of the FileCheck directives, exercised together.
+;
+; RUN: printf 'header\nalpha 17\nbeta 18\n\ntrailer\n' | FileCheck %s
+
+; CHECK-LABEL: header
+; CHECK:       alpha [[#N:]]
+; CHECK-NEXT:  beta [[#N+1]]
+; CHECK-NOT:   gamma
+; CHECK-EMPTY:
+; CHECK:       trailer

@@ -1,0 +1,4 @@
+; The simplest possible test: run something, check its output.
+;
+; RUN: echo hello world | FileCheck %s
+; CHECK: hello world
