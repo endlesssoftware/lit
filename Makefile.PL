@@ -25,8 +25,17 @@ my %args = (
     EXE_FILES     => [ 'bin/lit.pl', 'bin/filecheck.pl' ],
     PL_FILES      => {},
     PREREQ_PM     => {},          # core modules only, by design
-    dist          => { COMPRESS => 'gzip -9f', SUFFIX => 'gz' },
-    clean         => { FILES => 'Lit-0.[0-9]* t/tmp examples/demo/_out' },
+    # Ship a zip rather than a tarball: Info-ZIP's unzip is the de-facto
+    # standard on OpenVMS, and MM_VMS's zipfile target defaults ZIPFLAGS
+    # to -Vu, which preserves VMS file attributes.  Only DIST_DEFAULT is
+    # set here so that each platform keeps its own ZIP and ZIPFLAGS
+    # defaults; "make tardist" still works if a tarball is wanted.
+    dist          => { DIST_DEFAULT => 'zipdist' },
+    # Do NOT list Lit-* here.  "make dist" depends on $(FIRST_MAKEFILE),
+    # whose rebuild rule runs "make -f Makefile.old clean", which would
+    # then delete the archive that had just been built.  MakeMaker already
+    # removes the staging directory itself.
+    clean         => { FILES => 't/tmp examples/demo/_out' },
 );
 
 # MIN_PERL_VERSION arrived in 6.48; LICENSE in 6.31.

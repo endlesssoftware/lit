@@ -7,4 +7,6 @@
 /MANIFEST.bak
 /Lit-*
 *.tar.gz
+*.zip
 examples/demo/_out/
+lit-convert-removed.zip
