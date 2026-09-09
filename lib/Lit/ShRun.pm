@@ -293,3 +293,59 @@ sub run_line {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+Lit::ShRun - how a RUN: line is executed
+
+=head1 DESCRIPTION
+
+Executes the command lists produced by L<Lit::ShLex>.
+
+=head1 EXECUTION MODEL
+
+=over 4
+
+=item Pipelines run through temporary files
+
+Each stage writes a scratch file that the next stage reads, rather than a
+real pipe.  That costs a little I/O, but it works identically on hosts
+with no usable C<fork()>, and it cannot deadlock - which is safe here
+because a test script is always a finite, non-interactive computation.
+
+=item Redirections are applied left to right
+
+Exactly as a shell does, so C<< >out 2>&1 >> and C<< 2>&1 >out >> differ in
+the usual way: the first sends both streams to F<out>, the second sends
+stderr where stdout was going originally and only stdout to F<out>.
+
+Each descriptor is modelled as a file plus an append flag, and C<< 2>&1 >>
+copies fd 1's I<current> descriptor into fd 2.  When both end up on the
+same file they share one handle, so the interleaving is right.
+
+=item Pipelines fail if any stage fails
+
+C<pipefail> semantics, on by default; C<< $config->pipefail(0) >> reports
+only the last stage's status.
+
+=item A builtin is preferred over an external program of the same name
+
+So C<FileCheck>, C<diff> and the rest are answered in-process even when a
+native executable exists.
+
+=back
+
+=head1 SPAWNING
+
+External commands are run without any shell, by one of three backends
+chosen by the host - see L<Lit::Compat/SPAWNING>.  Redirections are set up
+by us in every case, which is what makes the same C<RUN:> line behave the
+same under F</bin/sh>, DCL and C<cmd.exe>.
+
+=head1 SEE ALSO
+
+L<Lit>, L<Lit::ShLex>, L<Lit::Builtins>, L<Lit::Compat>
+
+=cut

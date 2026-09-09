@@ -1095,3 +1095,91 @@ sub _bre_to_perl {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+Lit::Builtins - Unix commands implemented in-process
+
+=head1 DESCRIPTION
+
+Two reasons this exists.  First, OpenVMS has none of these, and requiring
+GNV to run a test suite is a poor trade.  Second, process creation on VMS
+is expensive enough that spawning a subprocess per CHECK step would
+dominate the run time; running C<FileCheck> in-process avoids that
+entirely.
+
+A builtin is preferred over an external program of the same name.
+
+=head1 COMMANDS
+
+    :  true  false  echo  printf  cat  pwd  cd  export  unset  env
+    basename  dirname  mkdir  rmdir  rm  touch  cp  mv  ln
+    head  tail  sort  uniq  wc  grep  sed  diff  test  [
+    not  count  FileCheck
+
+Notes on the ones that differ from their Unix namesakes:
+
+=over 4
+
+=item FileCheck
+
+Runs in-process - the single biggest win on OpenVMS.  Takes the same
+options as F<filecheck.pl>; see L<Lit::FileCheck>.
+
+=item not
+
+Inverts the exit status of the command it is given.  C<not --crash>
+instead requires abnormal termination.
+
+=item count I<n>
+
+LLVM's C<count>: succeeds when its input holds exactly I<n> lines.
+
+=item sed
+
+Supports C<-n>, C<-e>, C<-E>/C<-r>, and the C<s///>, C<d>, C<p> and C<q>
+commands with optional line-number or C</regex/> addresses.  Patterns are
+POSIX basic regular expressions by default - so C<\(> groups and a bare
+C<(> is literal - and extended ones under C<-E>.  Replacements understand
+C<&> and C<\1>..C<\9>.
+
+=item diff
+
+Unified output with C<-u>, and C<-b>, C<-w>, C<-i>, C<-q> and
+C<--strip-trailing-cr>.  Common prefix and suffix are trimmed before the
+quadratic comparison, which keeps it usable on the large listings a
+compiler suite tends to compare.
+
+=item ln
+
+Copies, because ODS-2 has no links.
+
+=item grep
+
+C<-v>, C<-i>, C<-c>, C<-q>, C<-F> and C<-e>.  Patterns are Perl regular
+expressions, a superset of what C<grep -E> accepts.
+
+=back
+
+=head1 WRITING A BUILTIN
+
+Each has the signature
+
+    sub { my ($argv, $ctx) = @_; return $exit_code }
+
+where C<$argv> includes C<argv[0]> and C<$ctx> provides C<in>, C<out> and
+C<err> filehandles already pointed at the right places, a mutable
+C<shell> holding C<cwd> and C<env>, and C<exec> for running a nested
+command as C<not> and C<env> do.
+
+A builtin must resolve relative paths against C<< $ctx->{shell}{cwd} >>
+itself: the Perl process's own working directory is never changed, because
+that would not survive parallel execution.
+
+=head1 SEE ALSO
+
+L<Lit>, L<Lit::ShRun>, L<Lit::FileCheck>
+
+=cut

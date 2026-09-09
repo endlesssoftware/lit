@@ -126,3 +126,81 @@ sub load_config {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+Lit::LitConfig - the $lit_config object seen by config files
+
+=head1 DESCRIPTION
+
+The global driver configuration: command line parameters, verbosity, and
+the host facts that C<REQUIRES:> and C<UNSUPPORTED:> lines are usually
+written against.  Config files receive it as C<$lit_config>.
+
+=head1 METHODS
+
+=head2 Parameters
+
+=over 4
+
+=item param($name, $default)
+
+The value of C<--param NAME=VALUE> (or C<-DNAME=VALUE>), or C<$default>.
+This is the intended way for a suite to learn where its build tree is, or
+which of several tools to exercise.
+
+=item set_param($name, $value), params()
+
+Set one, or fetch the whole hashref.
+
+=back
+
+=head2 Host facts
+
+=over 4
+
+=item is_vms(), is_windows(), is_unix()
+
+=item host_os(), host_arch()
+
+C<$^O> and the Perl C<archname>.
+
+=item host_features()
+
+The features added to every suite automatically.  Use these rather than
+detecting anything yourself:
+
+    system-openvms openvms vms      (or system-linux, system-tru64, ...)
+    vax alpha ia64 x86_64 x86 aarch64
+    host-endian-little  host-endian-big
+    int64
+
+So C<REQUIRES: system-openvms> and C<UNSUPPORTED: vax> work in any suite
+without configuration.
+
+=back
+
+=head2 Loading and diagnostics
+
+=over 4
+
+=item load_config($config, $path)
+
+Load another config file into C<$config>.  Called from a site config to
+pull in the suite's F<lit.cfg> once it has set the roots.
+
+=item note($msg), warning($msg), error($msg), fatal($msg)
+
+Diagnostics.  C<fatal> exits immediately with status 2.
+
+=item num_errors(), num_warns()
+
+=back
+
+=head1 SEE ALSO
+
+L<Lit>, L<Lit::Config>, L<Lit::BoolExpr>
+
+=cut

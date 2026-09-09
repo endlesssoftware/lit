@@ -80,3 +80,42 @@ sub temp_base {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+Lit::Test - a single test and its result
+
+=head1 RESULT CODES
+
+    PASS          passed
+    FLAKYPASS     passed, but only after an ALLOW_RETRIES retry
+    XFAIL         failed, and was expected to (XFAIL:)
+    UNSUPPORTED   skipped by REQUIRES: or UNSUPPORTED:
+    XPASS         passed, but was expected to fail
+    FAIL          failed
+    TIMEOUT       exceeded the per-test time limit
+    UNRESOLVED    could not be run: unreadable, unparsable, or no RUN: line
+
+The last four count as failures and make C<lit.pl> exit non-zero.  C<XPASS>
+is among them deliberately: an C<XFAIL:> marker that has quietly started
+passing is a defect in the test suite.
+
+=head1 METHODS
+
+    name()        "suite name :: relative/path"
+    path()        absolute source path, Unix syntax
+    rel()         path relative to the suite root
+    config()      the effective Lit::Config for this test
+    result()      one of the codes above
+    output()      the failure report
+    elapsed()     seconds
+    exec_dir()    this test's own Output directory
+    temp_base()   the value %t expands to
+
+=head1 SEE ALSO
+
+L<Lit>, L<Lit::TestRunner>
+
+=cut

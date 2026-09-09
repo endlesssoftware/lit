@@ -199,3 +199,30 @@ sub _make_test {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+Lit::Discovery - finding test suites and tests
+
+=head1 DESCRIPTION
+
+A directory becomes a test suite root when it contains a config file.
+Starting from each path named on the command line, discovery walks
+B<upwards> to find that root, then downwards collecting files whose suffix
+the effective config accepts.
+
+Each directory may refine the configuration with a local config file,
+which sees a clone of its parent's - so a change applies to that directory
+and everything below it, and nowhere else.  Naming a single file on the
+command line still applies every local config between the suite root and
+that file.
+
+See L<Lit::Config> for the config file names and the C<$config> API.
+
+=head1 SEE ALSO
+
+L<Lit>, L<Lit::Config>, L<Lit::Test>
+
+=cut

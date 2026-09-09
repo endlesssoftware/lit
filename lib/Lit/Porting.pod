@@ -1,0 +1,129 @@
+=head1 NAME
+
+Lit::Porting - porting a Python lit.cfg to Perl by hand
+
+=head1 DESCRIPTION
+
+Config files are the only thing that needs porting.  Tests carry over
+unchanged - their C<RUN:>, C<CHECK:>, C<REQUIRES:> and C<XFAIL:> lines mean
+the same thing here - and a suite normally has one F<lit.cfg> plus a
+handful of one-line local configs.  It is a short job, done once.
+
+=head1 WHY THERE IS NO CONVERTER
+
+There is deliberately no automatic translator.  A F<lit.cfg> is arbitrary
+Python, so a converter would have to keep growing to cover whatever the
+next config happens to do, and the interesting failures are the silent
+ones.
+
+To take one example: Python and Perl disagree about the truth of the
+string C<'0'> - Python says true, Perl says false - so a mechanical
+C<< if x: >> to C<< if ($x) >> inverts the branch with nothing to warn
+you.  A config decides which tests run and which are skipped; that is the
+wrong place to be approximately right.
+
+=head1 WHAT MAPS TO WHAT
+
+    Python                                Perl
+    ----------------------------------    ------------------------------------
+    config.name = 'x'                     $config->name('x');
+    config.suffixes = ['.c', '.ll']       $config->suffixes('.c', '.ll');
+    config.excludes = ['Inputs']          $config->excludes('Inputs');
+    config.test_source_root =             $config->test_source_root($config->dir);
+        os.path.dirname(__file__)
+    config.test_exec_root =               $config->test_exec_root($a . '/' . $b);
+        os.path.join(a, b)
+    config.available_features.add('x')    $config->add_feature('x');
+    config.substitutions.append((k, v))   $config->add_substitution($k, $v);
+    config.excludes.append('x')           $config->add_exclude('x');
+    config.environment['X'] = v           $config->env('X', $v);
+    config.unsupported = True             $config->unsupported(1);
+    config.pipefail = False               $config->pipefail(0);
+    config.maxIndividualTestTime = n      $config->timeout($n);
+
+    lit_config.params.get('k', d)         $lit_config->param('k', $d);
+    lit_config.load_config(config, p)     $lit_config->load_config($config, $p);
+    lit_config.fatal(m) / .note(m)        $lit_config->fatal($m); / ->note($m);
+
+    os.environ['X']                       $ENV{'X'}
+    os.environ.get('X', d)                defined $ENV{X} ? $ENV{X} : $d
+    os.path.join(a, b)                    Lit::Compat::joinp($a, $b)
+    os.path.dirname(p)                    Lit::Compat::dirname_of($p)
+    os.path.basename(p)                   Lit::Compat::basename_of($p)
+    os.path.exists(p)                     -e $p
+    shutil.which(p)                       Lit::Compat::which($p)
+    'fmt %s' % x                          sprintf('fmt %s', $x)
+    a + b        (strings)                $a . $b
+    s.lower() / s.upper()                 lc($s) / uc($s)
+
+=head1 FOUR THINGS TO WATCH
+
+=over 4
+
+=item Python has no block scope
+
+A variable assigned inside an C<if>/C<else> is still live afterwards, so
+declare it with C<my> B<before> the C<if>, never at the assignment inside
+the branch.  Getting this wrong compiles cleanly and yields an empty
+value.
+
+=item Quote strings single
+
+Use single-quoted Perl strings for anything holding a C<$> or C<@>.  DCL
+command lines and VMS device specs are full of both, and a double-quoted
+Perl string would interpolate them.
+
+=item Truthiness differs
+
+As above.  Test explicitly - C<length($x)>, C<defined $x>, C<< $x ne '' >>
+- rather than relying on C<if ($x)>.
+
+=item config.test_format has no equivalent
+
+ShTest (C<RUN:> lines) is the only format implemented, and it is the
+default, so drop the line.
+
+=back
+
+=head1 SUITES WITH A CUSTOM TEST FORMAT
+
+If the Python suite sets C<config.test_format> to a class of its own, its
+behaviour lives in code that cannot be ported mechanically, and those
+tests need rewriting as C<RUN:> lines.
+
+That is usually less work than it sounds, because a custom format normally
+exists to work around limitations this implementation does not have.  The
+common reasons - lit's shell spawning each pipeline stage as an external
+process, C<FileCheck> having to be a separate executable, or the host's
+Python being unable to fork - are all answered here by the internal shell
+(L<Lit::ShRun>), the C<FileCheck> builtin, and serial execution on hosts
+without C<fork()>.
+
+Two idioms carry most of the weight:
+
+=over 4
+
+=item Put the tool invocation behind a substitution
+
+    $config->add_substitution('%{build}',
+        $lit_config->param('buildcmd', 'mms/description=%t.mms all'));
+
+The tests then say C<< RUN: %{build} > %t.out 2>&1 >> and stay
+tool-agnostic, exactly as a C<build_command> constructor argument did.
+
+=item Turn the tool selection into a feature
+
+    my $tool = lc($lit_config->param('tool', 'mms'));
+    $config->add_feature($tool);
+
+A format that implemented its own tool-scoped C<XFAIL:> handling now needs
+none: C<XFAIL: mms> already means "expected to fail under
+C<--param tool=mms>, expected to pass otherwise".
+
+=back
+
+=head1 SEE ALSO
+
+L<Lit>, L<Lit::Config>, L<Lit::LitConfig>, L<Lit::TestRunner>
+
+=cut

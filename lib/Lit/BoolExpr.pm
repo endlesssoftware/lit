@@ -148,3 +148,49 @@ sub _primary {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+Lit::BoolExpr - the REQUIRES:/UNSUPPORTED:/XFAIL: expression language
+
+=head1 DESCRIPTION
+
+Evaluates a boolean expression over the suite's feature set.
+
+    expr    := or
+    or      := and ('||' and)*
+    and     := not ('&&' not)*
+    not     := '!' not | primary
+    primary := '(' expr ')' | identifier | '{{' regex '}}'
+
+An identifier is true when it names an available feature.  C<{{regex}}> is
+true when the regex matches any available feature.  C<*> and C<true> are
+always true, C<false> never is.  A comma-separated list means the same as
+C<||>, which is how lit's older syntax is spelled.
+
+=head1 EXAMPLES
+
+    REQUIRES: vms && !vax
+    UNSUPPORTED: {{system-(linux|darwin)}}
+    XFAIL: *
+    XFAIL: mms, mmk
+
+Features come from three places: the host set added automatically (see
+L<Lit::LitConfig/host_features>), anything the config adds with
+C<< $config->add_feature >>, and - a useful idiom - a C<--param> turned
+into a feature so that existing directives keep working:
+
+    my $tool = lc($lit_config->param('tool', 'mms'));
+    $config->add_feature($tool);
+
+With that, C<XFAIL: mms> means "expected to fail under C<--param tool=mms>,
+and expected to B<pass> under any other tool", which is usually what a
+divergence between two implementations should assert.
+
+=head1 SEE ALSO
+
+L<Lit>, L<Lit::TestRunner>, L<Lit::Config>
+
+=cut

@@ -359,3 +359,111 @@ sub _format_report {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+Lit::TestRunner - test file directives and RUN: line substitutions
+
+=head1 DESCRIPTION
+
+Implements the ShTest format: read a test file's directives, apply
+substitutions, and execute the result with the internal shell.
+
+Directives are recognised anywhere in a line, so they sit inside whatever
+comment syntax the file already uses - C<; RUN:>, C<// RUN:>, C<! RUN:>
+and C<* RUN:> all work.
+
+=head1 DIRECTIVES
+
+=over 4
+
+=item RUN: I<command>
+
+A command to run.  The test fails at the first C<RUN:> line that exits
+non-zero.  A line ending in a backslash continues onto the next C<RUN:>
+line:
+
+    ; RUN: prog --a-long-option \
+    ; RUN:      --another | FileCheck %s
+
+State set by one C<RUN:> line persists into the next, so C<cd> and
+C<export> behave as they would in a script.  Each test runs with its
+working directory set to its own F<Output> directory.
+
+=item REQUIRES: I<expr>
+
+Skip the test unless the expression is true.
+
+=item UNSUPPORTED: I<expr>
+
+Skip the test if the expression is true.
+
+=item XFAIL: I<expr>
+
+The test is expected to fail.  C<XFAIL: *> always applies.  A test marked
+C<XFAIL> that passes anyway is reported as C<XPASS>, so the marker cannot
+rot unnoticed.
+
+=item ALLOW_RETRIES: I<n>
+
+Retry a failing test up to I<n> times before believing it.  A test that
+only passes on a retry is reported as C<FLAKYPASS>.
+
+=item DEFINE: %{name} = I<value>
+
+=item REDEFINE: %{name} = I<value>
+
+Define a substitution for the C<RUN:> lines that follow.  C<REDEFINE>
+replaces an existing definition rather than shadowing it.
+
+=item END.
+
+Stop scanning the file here.
+
+See L<Lit::BoolExpr> for the expression language.
+
+=back
+
+=head1 SUBSTITUTIONS
+
+=over 4
+
+=item %s, %S, %p
+
+The test file, its directory, and its directory again (C<%p> is an alias
+for C<%S>).
+
+=item %t, %T
+
+A scratch file base unique to this test, and the scratch directory.  Files
+matching C<%t*> are removed before each run, so a test cannot be fooled by
+its own leftovers.
+
+=item %basename_s, %basename_t
+
+=item %{pathsep}
+
+C<:> or C<;>.
+
+=item %%
+
+A literal percent sign.
+
+=back
+
+As with lit on Windows, C<%s> and friends give the host's B<native> path
+syntax while C<%/s> gives the forward-slash form.  On OpenVMS that is the
+difference between F<DISK:[DIR]FILE.EXT> and F</disk/dir/file.ext> - use
+C<%s> when handing a path to a native tool, and C<%/s> inside a builtin.
+
+Substitutions from the config file are applied before the built-in set,
+and the whole list runs to a fixed point, so a C<DEFINE:> may refer to
+C<%t> and a config substitution may refer to another.
+
+=head1 SEE ALSO
+
+L<Lit>, L<Lit::Config>, L<Lit::BoolExpr>, L<Lit::ShLex>
+
+=cut

@@ -677,3 +677,82 @@ sub _sh_quote {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+Lit::Compat - host portability layer
+
+=head1 DESCRIPTION
+
+Paths, temporary files, exit-status decoding, globbing and process
+spawning.  Mostly of interest when changing the code rather than when
+using it.
+
+Written to Perl 5.6 rules - no C<//>, C<say>, C<state>, named captures or
+post-5.8 core modules - because OpenVMS VAX is a supported host and its
+newest Perl is 5.8.
+
+=head1 PATHS
+
+Paths are held in Unix syntax everywhere inside the tools.  Perl's CRTL on
+OpenVMS accepts Unix paths in C<open>, C<opendir> and C<stat>, so the only
+place a conversion is needed is when a filename is handed to a foreign
+command - which is what C<to_native> and C<to_native_dir> are for.
+
+    to_unix($p)        native syntax -> the internal Unix form
+    to_native($p)      a file, in whatever the host's interpreter wants
+    to_native_dir($p)  likewise for a directory
+    joinp(@parts)      join, collapsing redundant separators
+    clean_path($p)     resolve . and .. textually
+    is_absolute($p)    understands /path, C:\path and DISK:[DIR]
+
+Temporary file names are kept legal on ODS-2: at most one dot, at most 39
+characters.
+
+=head1 SPAWNING
+
+C<spawn(\%job)> runs an external command with no shell involved, choosing
+one of three backends:
+
+=over 4
+
+=item C<fork>/C<exec>, where a real C<fork()> exists
+
+The child sets its process group so a timeout can kill the whole group,
+applies the redirections with C<open> onto the standard handles, and
+C<exec>s.
+
+=item DCL, on OpenVMS
+
+There is no usable C<fork()>, and DCL has no redirection operators, so the
+backend writes a throw-away command procedure that uses C<DEFINE/USER> to
+point C<SYS$INPUT>, C<SYS$OUTPUT> and C<SYS$ERROR> at the right files, then
+invokes it.
+
+Output always goes to a scratch file that is then copied or appended into
+place, because DCL creates a new file version rather than truncating and
+has no append mode for C<SYS$OUTPUT> at all.
+
+Every argument is quoted, since DCL upcases unquoted parameters and test
+suites depend on case-sensitive file names; the exception is a qualifier
+passed to a real DCL verb, which must stay bare.  Long argument lists are
+continued with a trailing hyphen, and the continuation record carries no
+C<$> - DCL concatenates the raw next record.
+
+=item C<system()>, as a fallback
+
+=back
+
+All three return a plain small integer exit code.  On OpenVMS that means
+decoding a VMS condition value: the POSIX exit code is recovered from a
+C<0x35A000>-based status when one is recognised, and otherwise the
+severity decides - odd (SUCCESS, INFO) is success, even (WARNING, ERROR,
+FATAL) is failure.
+
+=head1 SEE ALSO
+
+L<Lit>, L<Lit::ShRun>
+
+=cut

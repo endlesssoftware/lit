@@ -394,3 +394,88 @@ sub _validate_re {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+Lit::Pattern - FileCheck pattern syntax
+
+=head1 DESCRIPTION
+
+Compiles a FileCheck pattern into a Perl regex plus a list of post-match
+operations - variable definitions and numeric assertions.
+
+=head1 SYNTAX
+
+=over 4
+
+=item {{I<regex>}}
+
+An embedded regular expression.
+
+=item [[I<NAME>:I<regex>]]
+
+Define string variable I<NAME> from what the regex matches.
+
+=item [[I<NAME>]]
+
+Use it.  The current value is substituted literally.
+
+=item [[$I<NAME>:I<regex>]], [[$I<NAME>]]
+
+The same, but global: a C<$>-prefixed name survives C<--enable-var-scope>.
+
+=item [[@LINE]], [[@LINE+I<n>]], [[@LINE-I<n>]]
+
+The directive's own line number, which is how a test asserts a diagnostic
+points at the right place.
+
+=item [[#I<NAME>:]]
+
+Define numeric variable I<NAME>.
+
+=item [[#I<NAME>:I<expr>]]
+
+Define it, asserting the matched number equals I<expr>.
+
+=item [[#I<expr>]]
+
+Match a number equal to I<expr>.
+
+=item [[#%I<fmt>,...]]
+
+Any of the above with an explicit format: C<u>, C<d>, C<x> or C<X>,
+optionally with a precision, as in C<[[#%.8X,ADDR:]]>.
+
+=back
+
+Numeric expressions take literals (decimal, or hex with a C<0x> prefix),
+numeric variables, C<@LINE>, C<+> and C<->, and the functions C<add>,
+C<sub>, C<mul>, C<div>, C<min> and C<max>.
+
+=head1 SCOPE
+
+A variable is not available until its own match completes, so a use must
+appear on a later directive than the definition.  This is the same rule as
+LLVM's FileCheck, and it is why
+
+    CHECK: a [[#N:]] b [[#mul(N,3)]]
+
+fails: on that line C<N> is not yet defined.  Split it across two
+directives.
+
+=head1 REGEX DIALECT
+
+Embedded regexes are Perl regular expressions.  That is a superset of the
+POSIX ERE that LLVM's FileCheck accepts, so existing patterns work - but a
+pattern written here may not port back.
+
+Capturing groups inside C<{{...}}> are counted, so they do not disturb the
+numbering of the groups a C<[[NAME:...]]> definition relies on.
+
+=head1 SEE ALSO
+
+L<Lit>, L<Lit::FileCheck>
+
+=cut

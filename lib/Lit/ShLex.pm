@@ -217,3 +217,59 @@ sub _new_cmd {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+Lit::ShLex - the shell syntax accepted in RUN: lines
+
+=head1 DESCRIPTION
+
+Lexer and parser for the subset of POSIX shell syntax that appears in
+C<RUN:> lines.  A command line is never handed to a real shell, because on
+OpenVMS there isn't one - DCL has neither these operators nor the same
+quoting rules - so parsing it here is what makes a C<RUN:> line behave
+identically on every supported host.
+
+=head1 SUPPORTED
+
+=over 4
+
+=item Words
+
+Quoted with C<'...'>, C<"..."> or a backslash.  Inside double quotes a
+backslash escapes only C<"> C<\> C<$> and a backquote, as in a shell.
+
+=item Operators
+
+C<|>, C<||>, C<&&>, C<;>, and a leading C<!> to invert a command's status.
+
+=item Redirections
+
+C<< <file >>, C<< >file >>, C<<< >>file >>>, C<< N>file >>, C<<< N>>file >>>,
+C<< N>&M >>, C<< &>file >> and C<<< &>>file >>>.
+
+=item Globbing
+
+Unquoted words containing C<*>, C<?> or C<[...]> are expanded against the
+working directory.  The expansion is done directly rather than through
+Perl's C<glob>, whose behaviour varies by platform.  A pattern matching
+nothing is left alone.
+
+=back
+
+=head1 NOT SUPPORTED
+
+These are diagnosed as errors rather than silently mis-run: subshells,
+background C<&>, here-documents, and backquote substitution.
+
+C<$VAR> is not expanded, matching lit's own shell.  Use a substitution from
+the config file instead - that is what they are for, and it keeps a test
+readable on a host where the variable would not exist.
+
+=head1 SEE ALSO
+
+L<Lit>, L<Lit::ShRun>, L<Lit::Builtins>, L<Lit::TestRunner>
+
+=cut

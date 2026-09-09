@@ -782,3 +782,131 @@ sub _dump_input {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+Lit::FileCheck - FileCheck directives and matching semantics
+
+=head1 SYNOPSIS
+
+    my $rc = Lit::FileCheck::run(\@argv, {
+        in => $fh, out => $fh, err => $fh, cwd => $dir, env => \%env,
+    });
+
+=head1 DESCRIPTION
+
+A reimplementation of LLVM's C<FileCheck>.  Keeping the engine callable
+in-process matters on OpenVMS, where creating a subprocess for every CHECK
+step would dominate the run time; the internal shell dispatches the
+C<FileCheck> command straight here.
+
+Input is canonicalised before matching: C<CRLF> becomes C<LF>, and unless
+C<--strict-whitespace> is given, every run of spaces and tabs collapses to
+a single space.  The same collapsing is applied to the literal parts of a
+pattern, so a pattern written with aligned columns still matches.
+
+=head1 DIRECTIVES
+
+=over 4
+
+=item CHECK:
+
+Match anywhere at or after the current position.
+
+=item CHECK-NEXT:
+
+Match on the line immediately after the previous match.
+
+=item CHECK-SAME:
+
+Match on the same line as the previous match.
+
+=item CHECK-NOT:
+
+The pattern must B<not> appear between the previous match and the next
+positive one.
+
+=item CHECK-DAG:
+
+Consecutive C<CHECK-DAG:> directives form a group that may match in any
+order, but whose matches may not overlap.
+
+=item CHECK-LABEL:
+
+Split the input into blocks.  Labels are matched first, and the other
+directives in each block are then confined to it - which stops a failure
+in one function's output from being satisfied by another's.
+
+=item CHECK-EMPTY:
+
+The next line must be blank.
+
+=item CHECK-COUNT-I<n>:
+
+Equivalent to I<n> consecutive C<CHECK:> directives.
+
+=back
+
+A C<-NEXT>, C<-SAME> or C<-EMPTY> directive cannot be the first for its
+prefix, and an empty pattern is an error; both are diagnosed rather than
+quietly ignored.
+
+=head1 OPTIONS
+
+=over 4
+
+=item --check-prefix=I<PREFIX>, --check-prefixes=I<A,B>
+
+Directive prefixes to honour; the default is C<CHECK>.
+
+=item --comment-prefixes=I<A,B>
+
+Prefixes that hide the rest of the line; the default is C<COM,RUN>.  This
+is why a test file can hold its own C<RUN:> lines and still be its own
+check file.
+
+=item --input-file=I<FILE>
+
+Read the input from I<FILE> rather than standard input.
+
+=item --strict-whitespace, --match-full-lines, --ignore-case
+
+=item --implicit-check-not=I<PATTERN>
+
+Apply I<PATTERN> as a C<CHECK-NOT> across the whole input.
+
+=item --allow-empty
+
+Permit empty input, which is otherwise an error.
+
+=item --enable-var-scope
+
+Clear variables not named with a leading C<$> at each C<CHECK-LABEL>.
+
+=item --allow-unused-prefixes
+
+Do not warn when a prefix matches nothing.
+
+=item -DI<NAME>=I<VALUE>, -D#I<NAME>=I<VALUE>
+
+Predefine a string or numeric variable.
+
+=item --dump-input=I<never>|I<fail>|I<always>, --dump-input-context=I<N>
+
+Control the annotated input dump printed on failure.
+
+=back
+
+=head1 EXIT STATUS
+
+0 when every directive matched, 1 when one did not, and 2 for a usage error
+or an unreadable file.
+
+=head1 SEE ALSO
+
+L<Lit>, L<Lit::Pattern>, L<filecheck.pl>,
+L<https://llvm.org/docs/CommandGuide/FileCheck.html>
+
+=cut

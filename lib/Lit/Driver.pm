@@ -448,3 +448,34 @@ sub _write_xunit {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+Lit::Driver - command line driver behind lit.pl
+
+=head1 DESCRIPTION
+
+Argument parsing, discovery, execution and reporting.  F<bin/lit.pl> is a
+thin wrapper around C<run()>; see L<lit.pl> for the options.
+
+=head1 EXECUTION
+
+With a working C<fork()> the driver runs tests in parallel, defaulting to
+the CPU count, each in a child that reports its result back through a
+scratch file.  On OpenVMS, where there is no usable C<fork()>, the run is
+serial regardless of C<-j>.
+
+Results are printed as they complete, so with C<-j> greater than one they
+arrive out of order.  C<--order=lexical>, the default, controls the order
+work is B<started> in.
+
+C<--max-failures> stops new tests being started once the limit is reached;
+tests already running are allowed to finish.
+
+=head1 SEE ALSO
+
+L<Lit>, L<lit.pl>, L<Lit::Discovery>, L<Lit::TestRunner>
+
+=cut
