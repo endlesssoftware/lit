@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-use Test::More tests => 22;
+use Test::More tests => 37;
 
 use Lit::Compat;
 use Lit::ShRun;
@@ -16,9 +16,11 @@ sub proc_for {
 # ---- multi-line DCL ------------------------------------------------------
 
 my $multi = proc_for(
-    dcl    => [ 'mmk := $DISK:[MMK]MMK.EXE',
+    dcl    => [ q{SET DEFAULT [.nosuchdir]},
+                q{mmk := $DISK:[MMK]MMK.EXE},
                 'mmk/extended_syntax/description=x.mms all' ],
-    stdout => '/work/out', stderr => '&1', cwd => '/work',
+    stdout => '/work/out', stderr => '&1',
+           cwd    => 'DISK$SCRATCH:[BUILD.TEST.OUTPUT]',
 );
 
 # DEFINE/USER lasts only until the next image exits, so a fragment with two
@@ -37,19 +39,41 @@ like($multi, qr{^\$ mmk/extended_syntax/description=x\.mms all$}m,
      'and the build line follows it verbatim, qualifiers intact');
 like($multi, qr{mmk :=.*mmk/extended_syntax}s, 'in that order, in the same procedure');
 
-like($multi, qr{\$ SET DEFAULT /work}, 'cwd becomes SET DEFAULT');
+like($multi, qr{\$ SET DEFAULT DISK\$SCRATCH:\[BUILD\.TEST\.OUTPUT\]},
+     'cwd becomes SET DEFAULT in VMS directory syntax');
 like($multi, qr{\$ EXIT __lit_sts\n\z}, 'the procedure ends by exiting with the status');
 
 # ---- single command: the pre-existing path is unchanged ------------------
 
 my $single = proc_for(
     argv   => [ '/sys$system/brcob.exe', '-c', 'hello.cob' ],
-    stdout => '/work/out', stderr => '/work/err', cwd => '/work',
+    stdout => '/work/out', stderr => '/work/err',
+           cwd    => 'DISK$SCRATCH:[BUILD.TEST.OUTPUT]',
 );
 like($single, qr{DEFINE/USER/NOLOG SYS\$OUTPUT}, 'a single command still uses DEFINE/USER');
 unlike($single, qr{DEASSIGN}, 'and needs no deassign');
-like($single, qr{__lit_cmd :== \$/sys\$system/brcob\.exe}, 'foreign command defined');
+like($single, qr{__lit_cmd := \$/sys\$system/brcob\.exe},
+     'foreign command defined with := , which is local to the procedure');
+unlike($single, qr{__lit_cmd :==},
+       'not :== , which would leave a global symbol behind');
 like($single, qr{__lit_cmd "-c" "hello\.cob"}, 'arguments quoted to preserve case');
+
+# ---- failure handling ----------------------------------------------------
+
+# An intermediate failure must end the sequence, not be swallowed while
+# later commands run against a broken state.
+for my $p ([multi => $multi], [single => $single]) {
+    my ($what, $text) = @$p;
+    like($text, qr{^\$ ON WARNING THEN GOTO __lit_done$}m,
+         "$what: a failure jumps to the cleanup label");
+    like($text, qr{^\$ __lit_done:\n\$ __lit_sts = \$STATUS$}m,
+         "$what: \$STATUS is captured first, before SET NOON could clobber it");
+    like($text, qr{__lit_sts = \$STATUS\n\$ SET NOON},
+         "$what: cleanup itself cannot be cut short");
+    unlike($text, qr{\A\$ SET NOON}, "$what: SET NOON no longer disables checking up front");
+}
+like($multi, qr{ON WARNING.*SET DEFAULT \[\.nosuchdir\].*__lit_done:}s,
+     'the guard is established before any user line runs');
 
 # ---- record formatting ---------------------------------------------------
 
@@ -63,6 +87,28 @@ is($recs->[1], '    a.obj,b.obj',
    'a continuation record gets no $ prefix, since DCL concatenates it raw');
 is($recs->[2], '$ RUN x.exe', 'a bare line gains its $ prefix');
 is(scalar @$recs, 3, 'blank separators are dropped');
+
+# ---- unconverted paths are refused --------------------------------------
+#
+# to_native_dir() is an identity function off OpenVMS, so a Unix path
+# survives unchanged here - which is exactly the state the guard exists to
+# catch, and lets it be tested on any host.
+
+is(Lit::Compat::dcl_path_problem({ cwd => 'DISK$SCRATCH:[X]' }, undef, undef),
+   undef, 'a VMS directory spec is accepted');
+
+like(Lit::Compat::dcl_path_problem({ cwd => '/work' }, undef, undef),
+     qr/cannot express the working directory '\/work' in VMS syntax/,
+     'a Unix path would give "SET DEFAULT /work", which is not DCL, so it is refused');
+
+like(Lit::Compat::dcl_path_problem({ stdin => '/tmp/in' }, undef, undef),
+     qr/standard input/, 'the same check covers SYS$INPUT');
+
+like(Lit::Compat::dcl_path_problem({}, '/tmp/o.tmp', undef),
+     qr/scratch file/, 'and the scratch files interpolated into the procedure');
+
+is(Lit::Compat::dcl_path_problem({ cwd => 'X:[Y]', stderr => '&1' }, 'X:[Y]O.TMP', undef),
+   undef, 'a merged stderr is not mistaken for a path');
 
 # ---- the builtin ---------------------------------------------------------
 

@@ -107,6 +107,26 @@ failing tests' output), and show-all (show every test's output).
 
 Print each test's elapsed time.
 
+=item B<--output>=I<FILE>
+
+Write JSON results to I<FILE>, in lit's own results-file format:
+
+    {"__version__": [1, 0, 0],
+     "elapsed": 12.3,
+     "tests": [
+      {"name": "suite :: a.test", "code": "PASS", "elapsed": 0.01},
+      {"name": "suite :: b.test", "code": "FAIL", "elapsed": 0.02,
+       "output": "..."}
+     ]}
+
+C<output> is present only where there is some, which in practice means the
+failures.  Tests that never started - because C<--max-failures> stopped the
+run - are omitted rather than invented.
+
+This is the replacement for a Python test format writing its own
+F<last-run.json>: a whole-run summary has to be produced by the driver,
+which is the only thing that sees every result.
+
 =item B<--xunit-xml-output>=I<FILE>
 
 Write JUnit XML results to I<FILE>.

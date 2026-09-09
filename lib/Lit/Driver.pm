@@ -43,6 +43,7 @@ Output
   -v, --verbose           Show the output of failing tests
   -a, --show-all          Show the output of every test
   --time-tests            Print each test's elapsed time
+  --output=FILE           Write JSON results to FILE (lit's last-run.json)
   --xunit-xml-output=FILE Write JUnit XML results to FILE
   --version               Print version and exit
   -h, --help              This message
@@ -94,6 +95,8 @@ sub _parse_args {
             if ($name eq 'path')        { my $v=$need->(); return -1 unless defined $v; push @{$o->{path}}, $v; next }
             if ($name eq 'xunit-xml-output') {
                 my $v=$need->(); return -1 unless defined $v; $o->{xunit}=$v; next }
+            if ($name eq 'output' || $name eq 'results-file') {
+                my $v=$need->(); return -1 unless defined $v; $o->{output}=$v; next }
 
             if ($name eq 'quiet'   || $name eq 'q') { $o->{quiet}    = 1; next }
             if ($name eq 'succinct'|| $name eq 's') { $o->{succinct} = 1; next }
@@ -197,7 +200,8 @@ sub run {
 
     my $elapsed = Lit::Compat::now() - $t0;
     _summary($tests, $state, $elapsed, $out);
-    _write_xunit($tests, $o{xunit}, $err) if defined $o{xunit};
+    _write_json($tests, $o{output}, $elapsed, $err) if defined $o{output};
+    _write_xunit($tests, $o{xunit}, $err)           if defined $o{xunit};
 
     my $bad = 0;
     foreach my $t (@$tests) {
@@ -389,6 +393,71 @@ sub _summary {
     }
 }
 
+# ------------------------------------------------------------- JSON results
+#
+# lit's own results-file format, so that tooling written against
+# last-run.json keeps working:
+#
+#   {"__version__": [1, 0, 0], "elapsed": N, "tests": [ {...}, ... ]}
+#
+# Written by hand because JSON::PP is only core from 5.14, and OpenVMS VAX
+# tops out at 5.8.  One test per line rather than a single long line: VMS
+# text files are record oriented, and a very long record is asking for
+# trouble.
+
+sub _json_string {
+    my ($s) = @_;
+    $s = '' unless defined $s;
+    $s =~ s/\\/\\\\/g;          # backslash first, or we would escape our own
+    $s =~ s/"/\\"/g;
+    $s =~ s/\n/\\n/g;
+    $s =~ s/\r/\\r/g;
+    $s =~ s/\t/\\t/g;
+    $s =~ s/([\x00-\x1f])/sprintf('\\u%04x', ord($1))/ge;
+    return '"' . $s . '"';
+}
+
+sub _json_num {
+    my ($n) = @_;
+    $n = 0 unless defined $n;
+    $n = 0 + $n;
+    return sprintf('%d', $n) if $n == int($n) && abs($n) < 1e15;
+    return sprintf('%.6f', $n);
+}
+
+sub _write_json {
+    my ($tests, $file, $elapsed, $err) = @_;
+    local *FH;
+    unless (open(FH, '>', $file)) {
+        print $err "lit: cannot write '$file': $!\n";
+        return 0;
+    }
+
+    print FH '{"__version__": [1, 0, 0],' . "\n";
+    print FH ' "elapsed": ' . _json_num($elapsed) . ",\n";
+    print FH " \"tests\": [\n";
+
+    my $first = 1;
+    foreach my $t (@$tests) {
+        next unless defined $t->result;      # never started: report nothing
+        print FH ",\n" unless $first;
+        $first = 0;
+        print FH '  {"name": '    . _json_string($t->name)
+               . ', "code": '     . _json_string($t->result)
+               . ', "elapsed": '  . _json_num($t->elapsed);
+        # Only failures carry output, which keeps the file small without
+        # losing the part anyone actually reads.
+        print FH ', "output": ' . _json_string($t->output)
+            if defined $t->output && length $t->output;
+        print FH '}';
+    }
+
+    print FH "\n" unless $first;
+    print FH " ]}\n";
+    close FH;
+    return 1;
+}
+
 # --------------------------------------------------------------- JUnit XML
 
 sub _xml_escape {
@@ -473,6 +542,22 @@ work is B<started> in.
 
 C<--max-failures> stops new tests being started once the limit is reached;
 tests already running are allowed to finish.
+
+=head1 RESULTS FILES
+
+C<--output=FILE> writes lit's JSON results format and
+C<--xunit-xml-output=FILE> writes JUnit XML.  Both are produced after the
+run, from the complete result set.
+
+That placement is deliberate.  A summary of every test cannot be assembled
+from inside a test - a C<RUN:> line sees only its own - and under C<-j>
+several tests writing one file would race.  A Python test format that
+wrote its own F<last-run.json> maps onto C<--output>, not onto anything in
+the suite.
+
+The JSON is emitted by hand rather than through JSON::PP, which is only
+core from Perl 5.14, and is written a test per line: OpenVMS text files are
+record oriented, and one very long record invites trouble.
 
 =head1 SEE ALSO
 

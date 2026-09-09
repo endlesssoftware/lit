@@ -5,3 +5,4 @@ Revision history for Perl distribution Lit
       - Runs on OpenVMS (VAX, Alpha, I64, x86-64), Tru64 and Linux.
       - Internal shell (no /bin/sh required) with builtin commands.
       - dcl builtin: run verbatim DCL lines in one command procedure.
+      - --output writes lit-format JSON results (last-run.json).

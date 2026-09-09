@@ -529,8 +529,24 @@ sub build_dcl_procedure {
     my $qual    = $verbatim ? '/NOLOG' : '/USER/NOLOG';
 
     my @dcl;
-    push @dcl, '$ SET NOON';
     push @dcl, '$ __lit_def = F$ENVIRONMENT("DEFAULT")';
+
+    # Stop at the first failure and report it, rather than letting SET NOON
+    # swallow it while later commands run against a broken state - a failed
+    # SET DEFAULT followed by a build that then "succeeds" in the wrong
+    # directory is the case that matters.
+    #
+    # The threshold is WARNING, not ERROR, because that is exactly what
+    # exit_code_from_status() treats as failure: odd VMS severities
+    # (SUCCESS, INFO) succeed, even ones (WARNING, ERROR, FATAL) do not.
+    # Anything we would report as a non-zero exit therefore also ends the
+    # sequence.
+    #
+    # A fragment that wants the older behaviour can say so in its own DCL,
+    # since these lines are passed through verbatim:
+    #     dcl 'ON WARNING THEN CONTINUE' '...'
+    push @dcl, '$ ON WARNING THEN GOTO __lit_done';
+
     if (defined $job->{cwd}) {
         push @dcl, '$ SET DEFAULT ' . to_native_dir($job->{cwd});
     }
@@ -551,14 +567,20 @@ sub build_dcl_procedure {
         push @dcl, @{ _dcl_command($verb, \@rest) };
     }
 
+    # Cleanup runs whether we fell through or jumped here.  $STATUS must be
+    # captured before anything else: SET NOON would overwrite it.
+    push @dcl, '$ __lit_done:';
     push @dcl, '$ __lit_sts = $STATUS';
+    # Once an ON action fires, DCL reverts to the default (exit on error),
+    # so cleanup could otherwise be cut short by a tidy-up command that
+    # fails - a DEASSIGN of something we never got as far as defining.
+    push @dcl, '$ SET NOON';
     if ($verbatim) {
         push @dcl, '$ DEASSIGN SYS$INPUT';
         push @dcl, '$ DEASSIGN SYS$OUTPUT';
         push @dcl, '$ DEASSIGN SYS$ERROR' unless $merge;
     }
     push @dcl, '$ SET DEFAULT \'__lit_def\'';
-    push @dcl, '$ DELETE/SYMBOL/LOCAL __lit_def';
     push @dcl, '$ EXIT __lit_sts';
 
     return join("\n", @dcl) . "\n";
@@ -594,12 +616,46 @@ sub _dcl_verbatim {
     return \@out;
 }
 
+# A Unix-looking path reaching DCL is a bug, not a curiosity: "SET DEFAULT
+# /work" and "DEFINE SYS$OUTPUT /tmp/x" are not DCL commands.  It means the
+# conversion to VMS syntax did not happen - VMS::Filespec unavailable, or a
+# path vmspath() could not express - so report that rather than writing a
+# procedure which cannot possibly run.
+#
+# Only the paths that are actually interpolated into the procedure are
+# checked.  A job's stdout and stderr are not among them: those are written
+# by Perl afterwards, and Perl's CRTL is happy with Unix syntax.
+sub dcl_path_problem {
+    my ($job, $out_tmp, $err_tmp) = @_;
+
+    my @check;
+    push @check, [ 'working directory', $job->{cwd}, to_native_dir($job->{cwd}) ]
+        if defined $job->{cwd};
+    push @check, [ 'standard input', $job->{stdin}, to_native($job->{stdin}) ]
+        if defined $job->{stdin};
+    push @check, [ 'scratch file', $out_tmp, to_native($out_tmp) ]
+        if defined $out_tmp;
+    push @check, [ 'scratch file', $err_tmp, to_native($err_tmp) ]
+        if defined $err_tmp;
+
+    foreach my $c (@check) {
+        my ($what, $orig, $native) = @$c;
+        next unless defined $native && $native =~ m{^/};
+        return "cannot express the $what '$orig' in VMS syntax"
+             . ($HAVE_FILESPEC ? '' : '; VMS::Filespec is not available');
+    }
+    return undef;
+}
+
 sub _spawn_dcl {
     my ($job) = @_;
 
     my $com     = temp_file('litcmd');
     my $out_tmp = temp_file('litout');
     my $err_tmp = temp_file('literr');
+
+    my $bad = dcl_path_problem($job, $out_tmp, $err_tmp);
+    return (127, 0, $bad) if defined $bad;
 
     my $merge = (defined $job->{stderr} && $job->{stderr} eq '&1') ? 1 : 0;
 
@@ -652,7 +708,7 @@ sub _dcl_command {
     my $foreign = ($verb =~ /^[\$\@]/) ? 1 : 0;
 
     if ($foreign) {
-        push @lines, '$ __lit_cmd :== ' . $verb;
+        push @lines, '$ __lit_cmd := ' . $verb;
         $head = '$ __lit_cmd';
     } else {
         $head = '$ ' . $verb;
@@ -778,6 +834,17 @@ command - which is what C<to_native> and C<to_native_dir> are for.
 
 Temporary file names are kept legal on ODS-2: at most one dot, at most 39
 characters.
+
+C<to_native> and C<to_native_dir> are identity functions off OpenVMS,
+which is worth remembering when reading generated DCL on another host: a
+procedure printed on Linux shows F</disk/dir> where OpenVMS would show
+F<DISK:[DIR]>.
+
+Because that conversion is the only thing standing between an internal
+path and a command procedure, C<dcl_path_problem> checks the paths that
+are interpolated into one and refuses a job whose paths did not convert.
+C<SET DEFAULT /work> is not a DCL command, and failing with that said
+plainly beats writing a procedure that cannot run.
 
 =head1 SPAWNING
 

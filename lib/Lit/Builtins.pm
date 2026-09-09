@@ -1262,9 +1262,24 @@ C<DEFINE/USER> lasts only until the next image exits, so a fragment
 running two images would lose it halfway through.  C<dcl> therefore uses a
 process-level C<DEFINE> and an explicit C<DEASSIGN> before the exit.
 
-The procedure's exit status is that of its last line, as in a script.
-C<SET NOON> is in force, so an earlier line failing does not abort the
-rest - which is what you want when the first line is a symbol assignment.
+The generated procedure establishes C<ON WARNING THEN GOTO> a cleanup
+label before running any of your lines, so the first failure ends the
+sequence and is reported.  Without that, a failing C<SET DEFAULT> would be
+followed by a build running in the wrong directory, which might then
+"succeed" - a test passing for the wrong reason.
+
+The threshold is WARNING rather than ERROR because that is exactly what
+the exit-status mapping treats as failure: odd VMS severities (SUCCESS,
+INFO) succeed, even ones (WARNING, ERROR, FATAL) do not.  Anything
+reported as a non-zero exit therefore also stops the sequence.
+
+A fragment that wants the older, keep-going behaviour can say so itself,
+since these lines are passed through verbatim:
+
+    RUN: dcl 'ON WARNING THEN CONTINUE' 'DELETE/NOLOG old.tmp;*' '%{build}'
+
+Do not C<EXIT> from a fragment.  The redirection is deassigned after the
+last line, and exiting early would skip that.
 
 Long lines are passed through exactly as written.  If one needs to exceed
 DCL's record limit, write the continuation yourself with a trailing
