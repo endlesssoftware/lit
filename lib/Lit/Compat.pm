@@ -401,6 +401,16 @@ sub null_device {
 
 sub spawn {
     my ($job) = @_;
+
+    # A 'dcl' job carries raw DCL lines rather than an argv, and only the
+    # OpenVMS backend can run one.
+    if ($job->{dcl}) {
+        return (127, 0, 'no DCL command given') unless @{ $job->{dcl} };
+        return (127, 0, "DCL commands need OpenVMS; this host is $^O")
+            unless IS_VMS;
+        return _spawn_dcl($job);
+    }
+
     return (127, 0, 'no command given') unless $job->{argv} && @{ $job->{argv} };
     return _spawn_fork($job) if $HAVE_FORK;
     return _spawn_dcl($job)  if IS_VMS;
@@ -501,15 +511,22 @@ sub _child_exit {
 # place: DCL creates a new file version rather than truncating, and there is
 # no append mode for SYS$OUTPUT at all.
 
-sub _spawn_dcl {
-    my ($job) = @_;
-    my @argv = @{ $job->{argv} };
+# Build the text of the throw-away command procedure the DCL backend runs.
+#
+# Factored out of _spawn_dcl so it can be unit tested anywhere: this is the
+# one part of the OpenVMS path that does not itself need OpenVMS to check.
+#
+# Redirection differs between the two job shapes, and the difference
+# matters.  DEFINE/USER lasts only until the next image exits, which is
+# exactly right for a single command; a multi-line DCL fragment would lose
+# the redirection after its first image, so those get a process-level
+# DEFINE and an explicit DEASSIGN before the exit.
+sub build_dcl_procedure {
+    my ($job, $out_tmp, $err_tmp) = @_;
 
-    my $com     = temp_file('litcmd');
-    my $out_tmp = temp_file('litout');
-    my $err_tmp = temp_file('literr');
-
-    my $merge = (defined $job->{stderr} && $job->{stderr} eq '&1') ? 1 : 0;
+    my $merge   = (defined $job->{stderr} && $job->{stderr} eq '&1') ? 1 : 0;
+    my $verbatim = $job->{dcl} ? 1 : 0;
+    my $qual    = $verbatim ? '/NOLOG' : '/USER/NOLOG';
 
     my @dcl;
     push @dcl, '$ SET NOON';
@@ -519,23 +536,74 @@ sub _spawn_dcl {
     }
 
     my $in = defined $job->{stdin} ? to_native($job->{stdin}) : 'NLA0:';
-    push @dcl, '$ DEFINE/USER/NOLOG SYS$INPUT ' . $in;
-    push @dcl, '$ DEFINE/USER/NOLOG SYS$OUTPUT ' . to_native($out_tmp);
+    push @dcl, '$ DEFINE' . $qual . ' SYS$INPUT ' . $in;
+    push @dcl, '$ DEFINE' . $qual . ' SYS$OUTPUT ' . to_native($out_tmp);
     if ($merge) {
-        push @dcl, '$ DEFINE/USER/NOLOG SYS$ERROR SYS$OUTPUT';
+        push @dcl, '$ DEFINE' . $qual . ' SYS$ERROR SYS$OUTPUT';
     } else {
-        push @dcl, '$ DEFINE/USER/NOLOG SYS$ERROR ' . to_native($err_tmp);
+        push @dcl, '$ DEFINE' . $qual . ' SYS$ERROR ' . to_native($err_tmp);
     }
 
-    my ($verb, @rest) = _dcl_verb(\@argv, $job->{env});
-    push @dcl, @{ _dcl_command($verb, \@rest) };
+    if ($verbatim) {
+        push @dcl, @{ _dcl_verbatim($job->{dcl}) };
+    } else {
+        my ($verb, @rest) = _dcl_verb($job->{argv}, $job->{env});
+        push @dcl, @{ _dcl_command($verb, \@rest) };
+    }
 
     push @dcl, '$ __lit_sts = $STATUS';
+    if ($verbatim) {
+        push @dcl, '$ DEASSIGN SYS$INPUT';
+        push @dcl, '$ DEASSIGN SYS$OUTPUT';
+        push @dcl, '$ DEASSIGN SYS$ERROR' unless $merge;
+    }
     push @dcl, '$ SET DEFAULT \'__lit_def\'';
     push @dcl, '$ DELETE/SYMBOL/LOCAL __lit_def';
     push @dcl, '$ EXIT __lit_sts';
 
-    write_file($com, join("\n", @dcl) . "\n")
+    return join("\n", @dcl) . "\n";
+}
+
+# Turn user-written DCL text into procedure records.  Each argument may
+# itself hold newlines.  A leading '$' is supplied where DCL needs one, but
+# never on a continuation record - one following a line ending in '-' -
+# because DCL concatenates those raw.
+#
+# Long lines are left exactly as written: wrapping them at a guessed space
+# could split a quoted string, and the author of a DCL fragment is better
+# placed than we are to say where it may break.
+sub _dcl_verbatim {
+    my ($lines) = @_;
+    my @out;
+    my $continued = 0;
+    foreach my $chunk (@$lines) {
+        next unless defined $chunk;
+        foreach my $raw (split(/\r?\n/, $chunk, -1)) {
+            if (!$continued && $raw !~ /\S/) { next }
+            if ($continued) {
+                push @out, $raw;
+            } else {
+                my $l = $raw;
+                $l =~ s/^\s+//;
+                $l = '$ ' . $l unless $l =~ /^\$/;
+                push @out, $l;
+            }
+            $continued = ($raw =~ /-[ \t]*$/) ? 1 : 0;
+        }
+    }
+    return \@out;
+}
+
+sub _spawn_dcl {
+    my ($job) = @_;
+
+    my $com     = temp_file('litcmd');
+    my $out_tmp = temp_file('litout');
+    my $err_tmp = temp_file('literr');
+
+    my $merge = (defined $job->{stderr} && $job->{stderr} eq '&1') ? 1 : 0;
+
+    write_file($com, build_dcl_procedure($job, $out_tmp, $err_tmp))
         or return (127, 0, "cannot write command procedure $com");
 
     my %saved;
@@ -713,8 +781,16 @@ characters.
 
 =head1 SPAWNING
 
-C<spawn(\%job)> runs an external command with no shell involved, choosing
-one of three backends:
+C<spawn(\%job)> runs an external command with no shell involved.  A job
+carries either an C<argv> to run directly, or - OpenVMS only - a C<dcl>
+arrayref of raw DCL lines to place in one command procedure; see
+L<Lit::Builtins/THE dcl BUILTIN>.
+
+C<build_dcl_procedure> returns the text of that procedure and is
+deliberately separate from running it, so the generated DCL can be checked
+on any host.
+
+There are three backends, chosen by the host:
 
 =over 4
 

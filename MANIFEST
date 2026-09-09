@@ -21,6 +21,7 @@ lib/Lit/Driver.pm
 lib/Lit/FileCheck.pm
 lib/Lit/LitConfig.pm
 lib/Lit/Pattern.pm
+lib/Lit/Porting.pod
 lib/Lit/ShLex.pm
 lib/Lit/ShRun.pm
 lib/Lit/Test.pm
@@ -37,3 +38,4 @@ t/30-shlex.t
 t/40-filecheck.t
 t/50-shell.t
 t/60-lit.t
+t/80-dcl.t

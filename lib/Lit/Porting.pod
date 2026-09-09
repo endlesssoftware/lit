@@ -99,7 +99,7 @@ Python being unable to fork - are all answered here by the internal shell
 (L<Lit::ShRun>), the C<FileCheck> builtin, and serial execution on hosts
 without C<fork()>.
 
-Two idioms carry most of the weight:
+Three idioms carry most of the weight:
 
 =over 4
 
@@ -119,6 +119,23 @@ tool-agnostic, exactly as a C<build_command> constructor argument did.
 A format that implemented its own tool-scoped C<XFAIL:> handling now needs
 none: C<XFAIL: mms> already means "expected to fail under
 C<--param tool=mms>, expected to pass otherwise".
+
+=item Use the dcl builtin for DCL command lines
+
+A Python format that wrote its own F<.COM> - to define a foreign command
+and then invoke it, say - maps onto C<dcl>, which puts several DCL lines
+in one procedure:
+
+    RUN: dcl '%{setup}' '%{build}' > %t.out 2>&1
+
+with the config supplying both:
+
+    $config->add_substitution('%{setup}',
+        length($img) ? "mmk := \$$img" : '!');
+    $config->add_substitution('%{build}',
+        "$tool/extended_syntax/description=%t.mms all");
+
+See L<Lit::Builtins/THE dcl BUILTIN>.
 
 =back
 

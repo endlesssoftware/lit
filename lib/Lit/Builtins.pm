@@ -1033,6 +1033,59 @@ sub _test_eval {
     return 0;
 }
 
+# ----------------------------------------------------------------- OpenVMS
+
+# Run one or more DCL command lines verbatim, in a single command
+# procedure, with the shell's redirections applied.
+#
+# Three things make this necessary rather than merely convenient:
+#
+#   * DCL symbols are local to a procedure, so a foreign command definition
+#     has to share a procedure with the command that uses it.  The ordinary
+#     path writes one procedure per command, which cannot express that.
+#
+#   * DCL attaches qualifiers without a space, as in
+#     "mms/description=x.mms all".  Word-splitting that as an argv gives a
+#     first word full of slashes, which the spawner would mistake for an
+#     image path.
+#
+#   * Passing a DCL line through argv quoting risks changing it.  Here the
+#     text reaches DCL exactly as written.
+#
+# Each argument is one DCL line; an argument may itself contain newlines.
+$BUILTIN{'dcl'} = sub {
+    my ($argv, $ctx) = @_;
+    my @a = @$argv;
+    shift @a;
+    @a = grep { defined && /\S/ } @a;
+    return _die($ctx, 'dcl', 'no DCL command given') unless @a;
+
+    unless (Lit::Compat::IS_VMS) {
+        print { $ctx->{err} }
+            "dcl: DCL commands need OpenVMS; this host is $^O.\n",
+            "dcl: guard such tests with 'REQUIRES: vms'.\n";
+        return 127;
+    }
+
+    my $fd = $ctx->{fd};
+    my $merge = (defined $fd->{2}{file} && defined $fd->{1}{file}
+                 && $fd->{2}{file} eq $fd->{1}{file}) ? 1 : 0;
+
+    my ($code, $timedout, $err) = Lit::Compat::spawn({
+        dcl        => \@a,
+        stdin      => $fd->{0}{file},
+        stdout     => $fd->{1}{file},
+        stderr     => ($merge ? '&1' : $fd->{2}{file}),
+        append_out => $fd->{1}{append},
+        append_err => $fd->{2}{append},
+        cwd        => $ctx->{shell}{cwd},
+        env        => $ctx->{shell}{env},
+    });
+
+    if (defined $err) { print { $ctx->{err} } "dcl: $err\n"; return 127 }
+    return $code;
+};
+
 # ---------------------------------------------------------------- FileCheck
 
 my $FILECHECK = sub {
@@ -1053,6 +1106,7 @@ my $FILECHECK = sub {
 $BUILTIN{'FileCheck'}    = $FILECHECK;
 $BUILTIN{'filecheck'}    = $FILECHECK;
 $BUILTIN{'filecheck.pl'} = $FILECHECK;
+
 
 # sed uses POSIX basic regular expressions by default, where \( groups and a
 # bare ( is literal -- the exact opposite of Perl.  Swap the two, leaving
@@ -1094,6 +1148,7 @@ sub _bre_to_perl {
     return $out;
 }
 
+
 1;
 
 __END__
@@ -1117,7 +1172,7 @@ A builtin is preferred over an external program of the same name.
     :  true  false  echo  printf  cat  pwd  cd  export  unset  env
     basename  dirname  mkdir  rmdir  rm  touch  cp  mv  ln
     head  tail  sort  uniq  wc  grep  sed  diff  test  [
-    not  count  FileCheck
+    not  count  dcl  FileCheck
 
 Notes on the ones that differ from their Unix namesakes:
 
@@ -1162,6 +1217,59 @@ C<-v>, C<-i>, C<-c>, C<-q>, C<-F> and C<-e>.  Patterns are Perl regular
 expressions, a superset of what C<grep -E> accepts.
 
 =back
+
+=head1 THE dcl BUILTIN
+
+    RUN: dcl '<line>' ['<line>' ...] > %t.out 2>&1
+
+Runs one or more DCL command lines verbatim, in a I<single> command
+procedure, with the shell's redirections applied.  Each argument is one
+DCL line, and an argument may itself contain newlines.  Off OpenVMS it
+refuses with status 127 rather than guessing, so guard such tests with
+C<REQUIRES: vms>.
+
+Three things make it necessary rather than merely convenient:
+
+=over 4
+
+=item *
+
+A DCL symbol is local to the procedure that defines it, so a foreign
+command definition has to share a procedure with the command that uses it.
+The ordinary path writes one procedure per command and cannot express
+that:
+
+    RUN: dcl 'mmk := $DISK$TOOLS:[MMK]MMK.EXE' \
+    RUN:     'mmk/extended_syntax/description=%t.mms all' > %t.out 2>&1
+
+=item *
+
+DCL attaches qualifiers without a space.  Word-splitting
+C<mms/description=x.mms all> as an argv yields a first word full of
+slashes, which the spawner would take for an image path.  Inside C<dcl>
+the text is never split.
+
+=item *
+
+An ordinary argv is quoted on the way to DCL, because DCL upcases unquoted
+parameters.  That is right for a program's arguments and wrong for a DCL
+command line; C<dcl> passes the text through untouched.
+
+=back
+
+Redirection differs from the ordinary path in a way worth knowing:
+C<DEFINE/USER> lasts only until the next image exits, so a fragment
+running two images would lose it halfway through.  C<dcl> therefore uses a
+process-level C<DEFINE> and an explicit C<DEASSIGN> before the exit.
+
+The procedure's exit status is that of its last line, as in a script.
+C<SET NOON> is in force, so an earlier line failing does not abort the
+rest - which is what you want when the first line is a symbol assignment.
+
+Long lines are passed through exactly as written.  If one needs to exceed
+DCL's record limit, write the continuation yourself with a trailing
+hyphen; the following record is emitted raw, without the leading C<$> that
+DCL would otherwise take as part of the command.
 
 =head1 WRITING A BUILTIN
 

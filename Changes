@@ -4,3 +4,4 @@ Revision history for Perl distribution Lit
       - Initial version: portable lit and FileCheck in pure Perl.
       - Runs on OpenVMS (VAX, Alpha, I64, x86-64), Tru64 and Linux.
       - Internal shell (no /bin/sh required) with builtin commands.
+      - dcl builtin: run verbatim DCL lines in one command procedure.
