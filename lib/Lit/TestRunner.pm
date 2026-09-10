@@ -227,6 +227,7 @@ sub execute {
     }
 
     my $elapsed = Lit::Compat::now() - $started;
+    $test->set_metrics(read_metrics($test));
 
     if ($timedout) {
         return $test->set_result('TIMEOUT', $report, $elapsed);
@@ -237,6 +238,27 @@ sub execute {
                                  $report, $elapsed);
     }
     return $test->set_result(($xfail ? 'XFAIL' : 'FAIL'), $report, $elapsed);
+}
+
+# Where the metrics builtin accumulates this test's measurements.  It sits
+# under %t, so _clean_temps removes any stale copy before each attempt.
+sub metrics_file {
+    my ($test) = @_;
+    return $test->temp_base . '.metrics';
+}
+
+# Read them back.  A repeated name takes its last value, which is what an
+# append-as-you-go file should mean.
+sub read_metrics {
+    my ($test) = @_;
+    my $text = Lit::Compat::read_file(metrics_file($test));
+    return {} unless defined $text;
+    my %m;
+    foreach my $line (split(/\n/, $text)) {
+        next unless $line =~ /^([A-Za-z_][A-Za-z0-9_.\-]*)=(.*)$/;
+        $m{$1} = $2;
+    }
+    return \%m;
 }
 
 sub _clean_temps {
@@ -265,6 +287,12 @@ sub _run_script {
         cwd => $execdir,
         env => { %{ $config->environment } },
     );
+
+    # Named in the environment rather than passed as an argument, so that an
+    # external tool can append to it as easily as the metrics builtin can.
+    # Native syntax for the same reason.
+    $shell{env}{LIT_METRICS_FILE} =
+        Lit::Compat::to_native(metrics_file($test));
 
     my $timeout = $config->timeout;
     $timeout = $lit->{timeout} if !$timeout && $lit->{timeout};

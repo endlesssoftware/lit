@@ -83,11 +83,25 @@ On OpenVMS:
     $ MMK TEST
     $ MMK INSTALL
 
-The two programs install as F<lit.pl> and F<filecheck.pl>.  On OpenVMS you
-will normally want foreign commands for them:
+The two programs install as F<lit.pl> and F<filecheck.pl>.
 
-    $ LIT       :== "PERL DISK$TOOLS:[LIT.BIN]LIT.PL"
-    $ FILECHECK :== "PERL DISK$TOOLS:[LIT.BIN]FILECHECK.PL"
+On OpenVMS you will normally want foreign commands for them.  C<MMK>
+generates F<[.VMS]LIT_DEFINE_COMMANDS.COM> for that, filling in the
+directory C<MMK INSTALL> actually used and the Perl image that will run
+the scripts.  It is not installed automatically, because writing to
+F<SYS$STARTUP:> needs privilege; copy it there yourself and call it from
+F<SYS$MANAGER:SYLOGIN.COM>, or let users call it from their own
+F<LOGIN.COM>.  It has to be one of those rather than
+F<SYSTARTUP_VMS.COM>: a symbol defined during system startup belongs to
+that process and never reaches a user's.
+
+    $ COPY [.VMS]LIT_DEFINE_COMMANDS.COM SYS$STARTUP:
+    $ @SYS$STARTUP:LIT_DEFINE_COMMANDS.COM
+    $ LIT -v [.TEST]
+
+The DCL itself is the template in the C<__DATA__> section of
+F<vms/mkcom.PL>; edit it there, since the generated F<.com> is rewritten by
+every build.
 
 Running from the source tree works too - both scripts locate F<../lib>
 themselves, and C<$LIT_PERL_LIB> overrides that if needed.

@@ -307,6 +307,7 @@ sub _run_parallel {
         } else {
             $t->set_result('UNRESOLVED', "worker produced no result", 0);
         }
+        $t->set_metrics(Lit::TestRunner::read_metrics($t));
         _report_one($t, $state);
     }
 
@@ -422,7 +423,20 @@ sub _json_num {
     $n = 0 unless defined $n;
     $n = 0 + $n;
     return sprintf('%d', $n) if $n == int($n) && abs($n) < 1e15;
-    return sprintf('%.6f', $n);
+    my $s = sprintf('%.6f', $n);
+    $s =~ s/0+$//;              # 1.230000 -> 1.23
+    $s =~ s/\.$//;
+    return $s;
+}
+
+# A metric that looks like a number is written as one, so that consumers
+# can do arithmetic without re-parsing; anything else stays a string.
+sub _json_value {
+    my ($v) = @_;
+    return 'null' unless defined $v;
+    return _json_num($v)
+        if $v =~ /^-?(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][-+]?[0-9]+)?$/;
+    return _json_string($v);
 }
 
 sub _write_json {
@@ -449,6 +463,17 @@ sub _write_json {
         # losing the part anyone actually reads.
         print FH ', "output": ' . _json_string($t->output)
             if defined $t->output && length $t->output;
+
+        my $m = $t->metrics;
+        if ($m && %$m) {
+            print FH ', "metrics": {';
+            my $sep = '';
+            foreach my $k (sort keys %$m) {
+                print FH $sep . _json_string($k) . ': ' . _json_value($m->{$k});
+                $sep = ', ';
+            }
+            print FH '}';
+        }
         print FH '}';
     }
 

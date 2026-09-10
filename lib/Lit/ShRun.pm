@@ -95,7 +95,7 @@ sub _expand_argv {
     my @out;
     foreach my $w (@{ $cmd->{argv} }) {
         my ($text, $quoted) = @$w;
-        if (!$quoted && $text =~ /[*?\[]/) {
+        if (!$quoted && Lit::Compat::is_glob($text)) {
             my @g = Lit::Compat::glob_expand($text, $shell->{cwd});
             push @out, @g;
         } else {
@@ -174,7 +174,8 @@ sub _dispatch {
 sub _run_builtin {
     my ($builtin, $argv, $fd, $shell, $opt) = @_;
 
-    my ($in, $out, $err, @close);
+    my ($in, $out, $err);
+    my @close;
     my $merged = 0;
 
     if (defined $fd->{0}{file}) {
@@ -212,6 +213,15 @@ sub _run_builtin {
         shell => $shell,
         exec  => sub {
             my ($nested_argv, $nested_ctx) = @_;
+
+            # Release our own handles on the redirection targets first.  The
+            # nested command opens the same files, and OpenVMS RMS will not
+            # grant a second write accessor by default: the nested open
+            # simply fails, and a wrapper like "not" then inverts an error
+            # rather than the command's real status.
+            foreach my $h (@close) { close($h) if $h }
+            @close = ();
+
             my $nshell = $nested_ctx->{shell};
             my $r = _dispatch($nested_argv, $nested_ctx->{fd}, $nshell, $opt);
             return $r->{code};

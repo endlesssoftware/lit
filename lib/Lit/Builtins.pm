@@ -1033,6 +1033,64 @@ sub _test_eval {
     return 0;
 }
 
+# ----------------------------------------------------------------- metrics
+
+# Record a measurement against the running test, for the JSON results file.
+#
+# This is the one thing a RUN: line can legitimately contribute to the
+# results, because it concerns only its own test.  A whole-run summary
+# cannot be assembled from here and belongs to the driver (--output).
+#
+#     RUN: metrics compile_time=1.23 object_size=4096
+#     RUN: %{build} | grep '^[a-z_]*=' | metrics
+#
+# The file is named by LIT_METRICS_FILE, which the runner puts in each
+# test's environment, so an external tool can append to it too.
+$BUILTIN{'metrics'} = sub {
+    my ($argv, $ctx) = @_;
+    my @a = @$argv;
+    shift @a;
+
+    my $file = $ctx->{shell}{env}{LIT_METRICS_FILE};
+    unless (defined $file && length $file) {
+        return _die($ctx, 'metrics',
+            'LIT_METRICS_FILE is not set; metrics can only be recorded from '
+          . 'inside a test');
+    }
+
+    # With no arguments, read NAME=VALUE lines from standard input, so a
+    # tool that already prints its own measurements can be piped straight in.
+    my @pairs = @a;
+    unless (@pairs) {
+        my $fh = $ctx->{in};
+        if ($fh) {
+            while (defined(my $l = <$fh>)) {
+                $l =~ s/\r?\n$//;
+                push @pairs, $l if $l =~ /\S/;
+            }
+        }
+    }
+    return _die($ctx, 'metrics', 'nothing to record') unless @pairs;
+
+    my $text = '';
+    foreach my $p (@pairs) {
+        unless ($p =~ /^([A-Za-z_][A-Za-z0-9_.\-]*)=(.*)$/s) {
+            return _die($ctx, 'metrics', "expected NAME=VALUE, got '$p'");
+        }
+        my ($name, $value) = ($1, $2);
+        $value =~ s/[\r\n]+/ /g;           # one record per metric
+        $text .= "$name=$value\n";
+    }
+
+    local *FH;
+    unless (open(FH, '>>', _p($ctx, $file))) {
+        return _die($ctx, 'metrics', "cannot write '$file': $!");
+    }
+    print FH $text;
+    close FH;
+    return 0;
+};
+
 # ----------------------------------------------------------------- OpenVMS
 
 # Run one or more DCL command lines verbatim, in a single command
@@ -1172,7 +1230,7 @@ A builtin is preferred over an external program of the same name.
     :  true  false  echo  printf  cat  pwd  cd  export  unset  env
     basename  dirname  mkdir  rmdir  rm  touch  cp  mv  ln
     head  tail  sort  uniq  wc  grep  sed  diff  test  [
-    not  count  dcl  FileCheck
+    not  count  dcl  metrics  FileCheck
 
 Notes on the ones that differ from their Unix namesakes:
 

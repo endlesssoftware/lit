@@ -8,13 +8,13 @@ package Lit::Config;
 #
 #     lit.cfg
 #     ------------------------------------------------------------------
-#     $config->name('brcob');
-#     $config->suffixes('.cob', '.pli');
+#     $config->name('mmk');
+#     $config->suffixes('.mmst';
 #     $config->test_source_root($config->dir);
 #     $config->test_exec_root($lit_config->param('build', '/build') . '/test');
 #
 #     $config->add_feature('vms') if $lit_config->is_vms;
-#     $config->add_substitution('%brcob', '/sys$system/brcob.exe');
+#     $config->add_substitution('%mmk', '/mmk_dir/mmk.exe');
 #     ------------------------------------------------------------------
 #
 # Config file names are chosen to be legal on ODS-2, which allows only one
@@ -166,7 +166,7 @@ sub features    { my ($self) = @_; return [ sort keys %{ $self->{features} } ] }
 
 # ------------------------------------------------------------ substitutions
 
-# add_substitution('%brcob', '/path/to/brcob')
+# add_substitution('%mmk', '/path/to/mmk')
 # add_substitution(qr/%foo(\d+)/, '...')     -- regex keys are allowed
 #
 # Later additions take precedence over earlier ones, and all user
@@ -265,7 +265,7 @@ ordinary Perl, so anything you can compute you can use.
     $config->test_exec_root($lit_config->param('build', '/build') . '/test');
 
     $config->add_feature('vms') if $lit_config->is_vms;
-    $config->add_substitution('%brcob', 'SYS$SYSTEM:BRCOB.EXE');
+    $config->add_substitution('%mmk', 'MMK_DIR:MMK.EXE');
 
 Errors report the config file's own line numbers, because the wrapper
 inserts a C<#line> directive before your code.
@@ -399,8 +399,8 @@ An OpenVMS compiler suite, invoked as
 
     $ LIT -v --param build=DISK$SCRATCH:[BUILD] --param cics=1 [.TEST]
 
-    $config->name('brcob');
-    $config->suffixes('.cob', '.pli');
+    $config->name('mmk');
+    $config->suffixes('.mmst');
     $config->test_source_root($config->dir);
 
     # Keep scratch output out of the source tree.  Note the Unix syntax:
@@ -409,10 +409,10 @@ An OpenVMS compiler suite, invoked as
     my $build = $lit_config->param('build', $config->dir);
     $config->test_exec_root($build . '/test');
 
-    # %brcob expands to a native path, so the DCL backend can turn it
+    # %mmk expands to a native path, so the DCL backend can turn it
     # into a foreign command.
-    $config->add_substitution('%brcob',
-        $lit_config->param('brcob', 'SYS$SYSTEM:BRCOB.EXE'));
+    $config->add_substitution('%mmk',
+        $lit_config->param('mmk', 'MMK_DIR:MMK.EXE'));
 
     # vax/alpha/ia64/x86_64 are added automatically from the host, so a
     # test can say "UNSUPPORTED: vax" with no help from here.

@@ -40,3 +40,4 @@ t/50-shell.t
 t/60-lit.t
 t/80-dcl.t
 t/90-output.t
+vms/mkcom.PL

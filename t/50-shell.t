@@ -1,11 +1,12 @@
 use strict;
 use warnings;
-use Test::More tests => 42;
+use Test::More tests => 46;
 
 use Lit::Compat;
 use Lit::ShRun;
 
 my $dir = Lit::Compat::joinp(Lit::Compat::temp_root(), 'littest_' . $$ . '_sh');
+
 Lit::Compat::rmtree($dir);
 Lit::Compat::mkpath($dir);
 
@@ -116,5 +117,15 @@ out_is('2>&1 merges',      "$PERL $HELP err 2>&1",           "to-stderr\n");
 rc_is ('exit code propagates', "$PERL $HELP exit 3",         3);
 out_is('env sets a variable',  "env FOO=bar $PERL $HELP env FOO", "bar\n");
 rc_is ('command not found', 'no_such_program_xyz_12345',     127);
+
+
+# A wrapper builtin must not keep the redirection targets open while the
+# command it wraps runs: OpenVMS RMS refuses a second write accessor, so the
+# nested open failed and "not" inverted that error instead of the command's
+# real status - making "not true" and "not false" both report success.
+rc_is('not true, output redirected',  'not true  > w1.txt',  1);
+rc_is('not false, output redirected', 'not false > w2.txt',  0);
+rc_is('env then a builtin',           'env A=1 false',       1);
+out_is('wrapper output still lands',  'not false > w3.txt; cat w3.txt', '');
 
 Lit::Compat::rmtree($dir);

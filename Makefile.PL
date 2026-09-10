@@ -23,7 +23,12 @@ my %args = (
     ABSTRACT      => 'Portable Perl reimplementation of LLVM lit and FileCheck',
     AUTHOR        => 'Tim Sneddon <tim.sneddon@es.solutions>',
     EXE_FILES     => [ 'bin/lit.pl', 'bin/filecheck.pl' ],
-    PL_FILES      => {},
+    # Generate the OpenVMS startup procedure at build time: it has to name
+    # the directory "make install" actually uses, and the Perl image that
+    # will run the scripts.  The generator is mkcom.PL rather than
+    # lit_define_commands.com.PL because the latter has two dots, which
+    # ODS-2 will not accept.
+    PL_FILES      => { 'vms/mkcom.PL' => 'vms/lit_define_commands.com' },
     PREREQ_PM     => {},          # core modules only, by design
     # Ship a zip rather than a tarball: Info-ZIP's unzip is the de-facto
     # standard on OpenVMS, and MM_VMS's zipfile target defaults ZIPFLAGS
@@ -35,7 +40,8 @@ my %args = (
     # whose rebuild rule runs "make -f Makefile.old clean", which would
     # then delete the archive that had just been built.  MakeMaker already
     # removes the staging directory itself.
-    clean         => { FILES => 't/tmp examples/demo/_out' },
+    clean         => { FILES => 't/tmp examples/demo/_out '
+                             . 'vms/lit_define_commands.com' },
 );
 
 # MIN_PERL_VERSION arrived in 6.48; LICENSE in 6.31.

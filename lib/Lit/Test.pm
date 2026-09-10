@@ -34,6 +34,7 @@ sub new {
         result   => undef,
         output   => '',
         elapsed  => 0,
+        metrics  => {},
         xfails   => [],
     };
     return bless $self, $class;
@@ -52,6 +53,14 @@ sub name {
     my ($self) = @_;
     my $suite = $self->{suite} ? $self->{suite}->name : 'tests';
     return $suite . ' :: ' . $self->{rel};
+}
+
+sub metrics { return $_[0]->{metrics} }
+
+sub set_metrics {
+    my ($self, $m) = @_;
+    $self->{metrics} = (defined $m && ref $m eq 'HASH') ? $m : {};
+    return $self;
 }
 
 sub set_result {
@@ -111,6 +120,7 @@ passing is a defect in the test suite.
     result()      one of the codes above
     output()      the failure report
     elapsed()     seconds
+    metrics()     hashref of values recorded by the metrics builtin
     exec_dir()    this test's own Output directory
     temp_base()   the value %t expands to
 

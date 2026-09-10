@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-use Test::More tests => 37;
+use Test::More tests => 43;
 
 use Lit::Compat;
 use Lit::ShRun;
@@ -46,17 +46,17 @@ like($multi, qr{\$ EXIT __lit_sts\n\z}, 'the procedure ends by exiting with the 
 # ---- single command: the pre-existing path is unchanged ------------------
 
 my $single = proc_for(
-    argv   => [ '/sys$system/brcob.exe', '-c', 'hello.cob' ],
+    argv   => [ '/mmk_dir/mmk.exe', '-c', 'hello.mms' ],
     stdout => '/work/out', stderr => '/work/err',
            cwd    => 'DISK$SCRATCH:[BUILD.TEST.OUTPUT]',
 );
 like($single, qr{DEFINE/USER/NOLOG SYS\$OUTPUT}, 'a single command still uses DEFINE/USER');
 unlike($single, qr{DEASSIGN}, 'and needs no deassign');
-like($single, qr{__lit_cmd := \$/sys\$system/brcob\.exe},
+like($single, qr{__lit_cmd := \$/mmk_dir/mmk\.exe},
      'foreign command defined with := , which is local to the procedure');
 unlike($single, qr{__lit_cmd :==},
        'not :== , which would leave a global symbol behind');
-like($single, qr{__lit_cmd "-c" "hello\.cob"}, 'arguments quoted to preserve case');
+like($single, qr{__lit_cmd "-c" "hello\.mms"}, 'arguments quoted to preserve case');
 
 # ---- failure handling ----------------------------------------------------
 
@@ -140,3 +140,40 @@ SKIP: {
 }
 
 Lit::Compat::rmtree($dir);
+
+# ---- the generated startup procedure -------------------------------------
+#
+# vms/mkcom.PL is run by make (PL_FILES) to produce
+# vms/lit_define_commands.com, which has to name the directory the scripts
+# were installed into.  Generating it from a test on any host keeps the
+# template honest.
+
+SKIP: {
+    skip 'mkcom.PL not present (running from an installed copy?)', 6
+        unless -f 'vms/mkcom.PL';
+
+    my $gen = Lit::Compat::joinp(Lit::Compat::temp_root(),
+                                 'littest_' . $$ . '_com.com');
+
+    # With paths supplied, as an OpenVMS build would.
+    system($^X, 'vms/mkcom.PL', $gen,
+           'DISK$TOOLS:[PERL.BIN]', 'DISK$TOOLS:[PERL]PERL.EXE');
+    my $com = Lit::Compat::read_file($gen);
+    ok(defined $com, 'the procedure is generated');
+    like($com, qr/LIT_ROOT = "DISK\$TOOLS:\[PERL\.BIN\]"/,
+         'the install directory is baked in');
+    like($com, qr/LIT_PERL = "DISK\$TOOLS:\[PERL\]PERL\.EXE"/,
+         'as is the Perl image');
+    like($com, qr/^\$ LIT       :== \$'LIT_PERL' 'LIT_ROOT'LIT\.PL$/m,
+         'LIT is defined as a foreign command');
+    unlink $gen;
+
+    # Built off OpenVMS the paths cannot be meaningful, so they are left
+    # empty rather than baking in a Unix path that DCL could not use.
+    system($^X, 'vms/mkcom.PL', $gen, '', '');
+    $com = Lit::Compat::read_file($gen);
+    like($com, qr/LIT_ROOT = ""/, 'an unknown path is left empty');
+    unlike($com, qr/\@LIT_(?:ROOT|PERL)\@/,
+           'no placeholder survives substitution');
+    unlink $gen;
+}

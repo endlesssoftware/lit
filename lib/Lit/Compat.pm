@@ -303,12 +303,47 @@ sub which {
 
 # ------------------------------------------------------------------ globbing
 
+# Does this word need globbing at all?
+#
+# The Unix set cannot be used on OpenVMS: '[' and ']' delimit the directory
+# of every absolute VMS path, so treating them as the start of a character
+# class turns $5$DKA0:[SYS0.SYSCOMMON.perl-5_34]perl.exe into a regex with
+# an invalid "l-5" range.  On VMS only '*' marks a pattern here.  VMS also
+# has '%' as a single-character wildcard, but a bare '%' is common enough in
+# ordinary text that treating it as one causes more surprises than it cures.
+sub is_glob {
+    my ($w) = @_;
+    return 0 unless defined $w && length $w;
+    return (index($w, '*') >= 0) ? 1 : 0 if IS_VMS;
+    return ($w =~ /[*?\[]/) ? 1 : 0;
+}
+
 # Portable glob.  Perl's built-in glob() shells out or behaves differently
 # per platform, so walk the directories ourselves.
 sub glob_expand {
     my ($pattern, $cwd) = @_;
-    return ($pattern) unless defined $pattern && $pattern =~ /[*?\[]/;
+    return ($pattern) unless is_glob($pattern);
 
+    # On OpenVMS, match in Unix syntax.  The walker below splits on '/',
+    # which a VMS file spec has none of, and would read its brackets as a
+    # character class.  Perl's CRTL is happy to opendir() a Unix path there.
+    if (IS_VMS) {
+        my @hits = eval {
+            my $upat = to_unix($pattern);
+            my $ucwd = defined $cwd ? to_unix($cwd) : undef;
+            my @u = _glob_unix($upat, $ucwd);
+            return ($pattern) if @u == 1 && $u[0] eq $upat;   # no match
+            map { to_native($_) } @u;
+        };
+        return ($pattern) if $@ || !@hits;
+        return @hits;
+    }
+
+    return _glob_unix($pattern, $cwd);
+}
+
+sub _glob_unix {
+    my ($pattern, $cwd) = @_;
     my $abs = is_absolute($pattern);
     my $work = $abs ? $pattern : joinp((defined $cwd ? $cwd : '.'), $pattern);
 
@@ -373,7 +408,16 @@ sub _glob_to_re {
         $i++;
     }
     my $ci = (IS_VMS || IS_WIN) ? '(?i)' : '';
-    return qr/^$ci$re$/;
+
+    # A bracket run that is not a valid character class - "[SYS0.PERL-5_34]"
+    # and its "l-5" range, say - must not take the process down.  Fall back
+    # to matching the segment literally, which simply means it expands to
+    # itself.
+    my $qr = eval { qr/^$ci$re$/ };
+    return $qr if $qr;
+    $qr = eval { qr/^$ci\Q$g\E$/ };
+    return $qr if $qr;
+    return qr/(?!)/;
 }
 
 # ------------------------------------------------------------------ spawning

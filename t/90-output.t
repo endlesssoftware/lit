@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-use Test::More tests => 22;
+use Test::More tests => 29;
 
 use Lit::Compat;
 use Lit::Driver;
@@ -25,7 +25,8 @@ is(Lit::Driver::_json_string("\\n"),        '"\\\\n"',
 
 is(Lit::Driver::_json_num(0),     '0',        'integer zero');
 is(Lit::Driver::_json_num(2),     '2',        'whole numbers stay integral');
-is(Lit::Driver::_json_num(1.5),   '1.500000', 'fractions get six places');
+is(Lit::Driver::_json_num(1.5),   '1.5',      'fractions keep no trailing zeros');
+is(Lit::Driver::_json_num(1.23),  '1.23',     'and read as written');
 is(Lit::Driver::_json_num(undef), '0',        'undef becomes zero');
 
 # --- end to end ----------------------------------------------------------
@@ -49,6 +50,10 @@ put('lit.cfg', join("\n",
 put('a_pass.test',  "RUN: echo hi | FileCheck %s\nCHECK: hi\n");
 put('b_fail.test',  "RUN: echo bye | FileCheck %s\nCHECK: hi\n");
 put('c_xfail.test', "XFAIL: *\nRUN: false\n");
+put('d_metrics.test',
+    "RUN: metrics compile_time=1.23 size=4096 tool=mmk-3.1\n"
+  . "RUN: printf 'parse_ms=17\\n' | metrics\n"
+  . "RUN: true\n");
 
 my $json  = Lit::Compat::joinp($root, 'last-run.json');
 my $xunit = Lit::Compat::joinp($root, 'results.xml');
@@ -74,6 +79,17 @@ like($text, qr/"name": "demo :: b_fail\.test", "code": "FAIL", .*"output": "Scri
      'a failing test carries its output too');
 like($text, qr/"name": "demo :: c_xfail\.test", "code": "XFAIL"/,
      'XFAIL is reported as its own code');
+
+# Metrics are the one thing a RUN: line can contribute to the results,
+# because they concern only its own test.
+like($text, qr/"name": "demo :: d_metrics\.test".*"metrics": \{/,
+     'metrics recorded from a RUN: line reach the results file');
+like($text, qr/"compile_time": 1\.23/,  'a fractional metric stays a number');
+like($text, qr/"size": 4096/,           'an integral one stays integral');
+like($text, qr/"tool": "mmk-3\.1"/,   'a non-numeric one is quoted');
+like($text, qr/"parse_ms": 17/,         'metrics can be piped in on stdin');
+unlike($text, qr/"name": "demo :: a_pass\.test"[^\n]*"metrics"/,
+       'a test that recorded none has no metrics key at all');
 
 # One test per line: VMS text files are record oriented, and a single very
 # long record is asking for trouble.
