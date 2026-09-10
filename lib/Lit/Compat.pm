@@ -655,10 +655,19 @@ sub _apply_env {
         else              { eval { delete $ENV{$k}; 1 } }
     }
 
-    foreach my $k (keys %ENV) {
-        next if $wanted{$k};
-        $restore{$k} = $ENV{$k};
-        eval { delete $ENV{$k}; 1 };
+    # Removing what the job does not mention is skipped on OpenVMS.  %ENV
+    # there is backed by logical name tables, so its key set is not
+    # necessarily the same at spawn time as when the config snapshotted it,
+    # and a delete would then tear down a logical nobody asked to remove -
+    # which is how "%SYSTEM-F-NOLOGNAM, no logical name match" arises.  The
+    # cost is that "env -i" cannot fully clear the environment there; the
+    # alternative is dismantling the process's logical names, which is worse.
+    unless (IS_VMS) {
+        foreach my $k (keys %ENV) {
+            next if $wanted{$k};
+            $restore{$k} = $ENV{$k};
+            delete $ENV{$k};
+        }
     }
 
     return \%restore;

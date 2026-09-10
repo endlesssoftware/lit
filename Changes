@@ -7,6 +7,9 @@ Revision history for Perl distribution Lit
       - dcl builtin: run verbatim DCL lines in one command procedure.
       - --output writes lit-format JSON results (last-run.json).
       - metrics builtin: record per-test values into the JSON results.
+      - Verified on OpenVMS (LEELA): builds with MMS, suite runs.
+      - MMS needs an explicit no-op on the degenerate subdirs-test_*
+        targets MakeMaker emits; MMK does not care, MMS refuses.
       - Fixed on OpenVMS: VMS file specs are no longer read as glob
         patterns; a wrapper builtin no longer holds a write handle open
         across the command it wraps; the environment is applied as a
