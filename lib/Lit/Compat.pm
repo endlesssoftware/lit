@@ -246,6 +246,40 @@ sub temp_file {
         sprintf('%s_%d_%d.tmp', $tag, $$ % 100000, $TMP_SEQ));
 }
 
+# A scratch *directory*, in Unix syntax, created and ready to use.
+#
+# Deliberately different from temp_root(), which is native because the files
+# under it get named in generated DCL.  A directory is another matter: Perl's
+# CRTL on OpenVMS handles Unix paths quite happily, including nested ones,
+# whereas the native form often cannot be built at all - SYS$SCRATCH: is a
+# plain logical naming a directory, so "SYS$SCRATCH:[SUB]" is a syntax error
+# while "/sys$scratch/sub" works.
+sub temp_subdir {
+    my ($tag) = @_;
+    $tag = 'lit' unless defined $tag && length $tag;
+    $tag =~ s/[^A-Za-z0-9_]/_/g;
+    $tag = substr($tag, 0, 10);
+    $TMP_SEQ++;
+    # Unixify the *expanded* scratch directory, not the logical naming it.
+    # SYS$SCRATCH translates to something like USERS:[CLAUDE], whose first
+    # component is a real rooted device, so /users/claude/x converts back to
+    # users:[claude]x cleanly.  Starting from the logical itself would give
+    # /sys$scratch/x, and converting that back yields sys$scratch:[x] - the
+    # very syntax error this whole area keeps producing.
+    my $base;
+    if (IS_VMS) {
+        $base = (defined $ENV{'SYS$SCRATCH'} && length $ENV{'SYS$SCRATCH'})
+              ? to_unix($ENV{'SYS$SCRATCH'})
+              : '/sys$scratch';
+        $base =~ s{/+$}{};
+    } else {
+        $base = temp_root();
+    }
+    my $dir  = joinp($base, sprintf('littmp_%d_%d_%s', $$ % 100000, $TMP_SEQ, $tag));
+    mkpath($dir);
+    return $dir;
+}
+
 my @CLEANUP;
 sub temp_file_auto {
     my $f = temp_file(@_);

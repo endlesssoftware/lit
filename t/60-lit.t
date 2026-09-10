@@ -1,13 +1,12 @@
 use strict;
 use warnings;
-use Test::More tests => 18;
+use Test::More tests => 21;
 
 use Lit::Compat;
+use Lit::Config;
 use Lit::Driver;
 
-my $root = Lit::Compat::joinp(Lit::Compat::temp_root(), 'littest_' . $$ . '_lit');
-Lit::Compat::rmtree($root);
-Lit::Compat::mkpath(Lit::Compat::joinp($root, 'sub'));
+my $root = Lit::Compat::temp_subdir('lit');
 
 sub put {
     my ($rel, $text) = @_;
@@ -86,3 +85,16 @@ like($out, qr/expected string not found in input/,
      'failure output includes the FileCheck diagnostic');
 
 Lit::Compat::rmtree($root);
+
+# The Output directory must be skipped whatever case readdir reports it in:
+# on OpenVMS an exact match would miss, and lit would then walk its own
+# scratch directory looking for tests.
+my $cfg = Lit::Config->new(dir => '.');
+ok($cfg->is_excluded('Output'), 'Output is excluded');
+if (Lit::Compat::IS_VMS || Lit::Compat::IS_WIN) {
+    ok($cfg->is_excluded('output'), 'and in whatever case readdir reports');
+    ok($cfg->is_excluded('OUTPUT'), 'either way');
+} else {
+    ok(!$cfg->is_excluded('output'), 'case matters where the filesystem cares');
+    ok(!$cfg->is_excluded('nothing'), 'an unrelated name is not excluded');
+}

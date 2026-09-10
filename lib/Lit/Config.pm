@@ -142,9 +142,19 @@ sub add_exclude {
     return 1;
 }
 
+# Case-insensitively where the filesystem is: readdir on OpenVMS may hand
+# back OUTPUT or output for the directory the excludes list calls "Output",
+# and an exact lookup would then walk a scratch directory looking for tests.
 sub is_excluded {
     my ($self, $name) = @_;
-    return $self->{excludes}{$name} ? 1 : 0;
+    return 0 unless defined $name;
+    return 1 if $self->{excludes}{$name};
+    return 0 unless Lit::Compat::IS_VMS || Lit::Compat::IS_WIN;
+    my $lc = lc $name;
+    foreach my $e (keys %{ $self->{excludes} }) {
+        return 1 if lc($e) eq $lc;
+    }
+    return 0;
 }
 
 # ----------------------------------------------------------------- features

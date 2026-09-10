@@ -31,9 +31,7 @@ is(Lit::Driver::_json_num(undef), '0',        'undef becomes zero');
 
 # --- end to end ----------------------------------------------------------
 
-my $root = Lit::Compat::joinp(Lit::Compat::temp_root(), 'littest_' . $$ . '_out');
-Lit::Compat::rmtree($root);
-Lit::Compat::mkpath($root);
+my $root = Lit::Compat::temp_subdir('out');
 
 sub put {
     my ($rel, $text) = @_;

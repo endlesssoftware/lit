@@ -5,10 +5,7 @@ use Test::More tests => 46;
 use Lit::Compat;
 use Lit::ShRun;
 
-my $dir = Lit::Compat::joinp(Lit::Compat::temp_root(), 'littest_' . $$ . '_sh');
-
-Lit::Compat::rmtree($dir);
-Lit::Compat::mkpath($dir);
+my $dir = Lit::Compat::temp_subdir('sh');
 
 # A helper spawned as a real subprocess.  Using $^X rather than /bin/sh keeps
 # these cases meaningful on hosts with no Unix shell.

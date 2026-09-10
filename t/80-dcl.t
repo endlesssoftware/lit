@@ -122,9 +122,7 @@ SKIP: {
 
 # ---- the builtin ---------------------------------------------------------
 
-my $dir = Lit::Compat::joinp(Lit::Compat::temp_root(), 'littest_' . $$ . '_dcl');
-Lit::Compat::rmtree($dir);
-Lit::Compat::mkpath($dir);
+my $dir = Lit::Compat::temp_subdir('dcl');
 
 sub sh {
     my ($line) = @_;
@@ -162,8 +160,9 @@ SKIP: {
     skip 'mkcom.PL not present (running from an installed copy?)', 6
         unless -f 'vms/mkcom.PL';
 
-    my $gen = Lit::Compat::joinp(Lit::Compat::temp_root(),
-                                 'littest_' . $$ . '_com.com');
+    # A file, not a directory: appended to the native scratch root.
+    my $gen = Lit::Compat::join_spec(Lit::Compat::temp_root(),
+                                     'littest_' . $$ . '_com.com');
 
     # With paths supplied, as an OpenVMS build would.
     system($^X, 'vms/mkcom.PL', $gen,

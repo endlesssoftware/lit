@@ -67,4 +67,31 @@ if ($mm >= 6.46) {
     };
 }
 
+# ---------------------------------------------------------------------------
+# MMS compatibility on OpenVMS.
+#
+# MakeMaker emits
+#
+#     subdirs-test_dynamic :: dynamic pure_all
+#
+# with dependencies but no actions.  MMK shrugs at that; MMS refuses with
+#
+#     %MMS-F-GWKNOACTS, Actions to update SUBDIRS-TEST_DYNAMIC are unknown.
+#
+# and the whole test target dies.  Which of the two MakeMaker writes for
+# depends on how the local Perl was built ($Config{make}), not on which is
+# installed - so a kit generated for MMK can easily be all a site has to
+# build with MMS.  Give the degenerate targets an explicit no-op, which MMS
+# accepts and MMK does not care about.
+{
+    package MY;
+
+    sub test {
+        my ($self, %attribs) = @_;
+        my $frag = $self->SUPER::test(%attribs);
+        $frag =~ s/^(subdirs-test_\w+\s*::[^\n]*)\n(?![\t ])/$1\n\t\$(NOECHO) \$(NOOP)\n/mg;
+        return $frag;
+    }
+}
+
 WriteMakefile(%args);

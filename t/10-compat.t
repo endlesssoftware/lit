@@ -27,9 +27,7 @@ ok(length($tf) <= 39, "temp name fits ODS-2 (got '$tf')");
 is(scalar(() = $tf =~ /\./g), 1, 'temp name has exactly one dot');
 
 # Globbing.
-my $dir = Lit::Compat::joinp(Lit::Compat::temp_root(),
-                             'littest_' . $$ . '_glob');
-Lit::Compat::mkpath($dir);
+my $dir = Lit::Compat::temp_subdir('glob');
 Lit::Compat::write_file(Lit::Compat::joinp($dir, $_), 'x')
     foreach ('a1.txt', 'a2.txt', 'b1.dat');
 my @hits = Lit::Compat::glob_expand('a*.txt', $dir);

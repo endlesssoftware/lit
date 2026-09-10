@@ -5,8 +5,7 @@ use Test::More tests => 33;
 use Lit::Compat;
 use Lit::FileCheck;
 
-my $dir = Lit::Compat::joinp(Lit::Compat::temp_root(), 'littest_' . $$ . '_fc');
-Lit::Compat::mkpath($dir);
+my $dir = Lit::Compat::temp_subdir('fc');
 
 my $seq = 0;
 sub check {
