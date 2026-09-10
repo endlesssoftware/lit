@@ -7,7 +7,15 @@ Revision history for Perl distribution Lit
       - dcl builtin: run verbatim DCL lines in one command procedure.
       - --output writes lit-format JSON results (last-run.json).
       - metrics builtin: record per-test values into the JSON results.
-      - Verified on OpenVMS (LEELA): builds with MMS, suite runs.
+      - Verified on OpenVMS: the whole suite runs and passes there.
+      - The shell lexer no longer splits a VMS file specification at the
+        ';' introducing its version number.
+      - Exit status decoding understands how Perl on OpenVMS maps exit(n)
+        onto a condition value: exit(3) and exit(5) land on odd severities
+        and previously read as success.
+      - An unrecognised DCL verb now reports 127, as "command not found"
+        does elsewhere.
+
       - MMS needs an explicit no-op on the degenerate subdirs-test_*
         targets MakeMaker emits; MMK does not care, MMS refuses.
       - Fixed on OpenVMS: VMS file specs are no longer read as glob

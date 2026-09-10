@@ -169,9 +169,14 @@ SKIP: {
            'DISK$TOOLS:[PERL.BIN]', 'DISK$TOOLS:[PERL]PERL.EXE');
     my $com = Lit::Compat::read_file($gen);
     ok(defined $com, 'the procedure is generated');
-    like($com, qr/LIT_ROOT = "DISK\$TOOLS:\[PERL\.BIN\]"/,
+    # Case-insensitively: OpenVMS Perl downcases @ARGV unless
+    # DECC$ARGV_PARSE_STYLE says otherwise, so the paths this test injects
+    # come back lowercased.  That is an artefact of injecting them through
+    # argv - mkcom.PL normally reads $Config{installscript} and $^X in its
+    # own process, where nothing touches the case.
+    like($com, qr/LIT_ROOT = "DISK\$TOOLS:\[PERL\.BIN\]"/i,
          'the install directory is baked in');
-    like($com, qr/LIT_PERL = "DISK\$TOOLS:\[PERL\]PERL\.EXE"/,
+    like($com, qr/LIT_PERL = "DISK\$TOOLS:\[PERL\]PERL\.EXE"/i,
          'as is the Perl image');
     like($com, qr/^\$ LIT       :== \$'LIT_PERL' 'LIT_ROOT'LIT\.PL$/m,
          'LIT is defined as a foreign command');

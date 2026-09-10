@@ -314,10 +314,27 @@ sub exit_code_from_status {
             my $n = eval { ${^CHILD_ERROR_NATIVE} };
             $native = $n if defined $n && $n != 0;
         }
+        # A CRTL program built for POSIX exit encodes the code in a
+        # 0x35A000-based status.
         if (($native & 0xFFF0000) == 0x35A0000) {
-            my $code = ($native & 0x7F8) >> 3;
-            return $code;
+            return ($native & 0x7F8) >> 3;
         }
+
+        # An unrecognised DCL verb is this platform's "command not found".
+        return 127 if $native == 0x00038090;              # %DCL-W-IVVERB
+
+        # Perl on OpenVMS, without POSIX exit, maps exit(0) to SS$_NORMAL,
+        # exit(1) to SS$_ABORT, and exit(n>=2) to the bare value n.  That
+        # last case is a trap: severity is n & 7, so exit(3) and exit(5)
+        # land on odd severities and would otherwise read as success - a
+        # failing tool reported as a passing test.  A genuine VMS condition
+        # value carries facility and message bits, so a bare small number
+        # can be taken at face value.
+        return 0 if $native == 1;                         # SS$_NORMAL
+        return 1 if $native == 0x2C;                      # SS$_ABORT
+        return $native if $native > 1 && $native < 256;
+
+        # Otherwise a real condition value: odd severities succeed.
         my $severity = $native & 7;
         return 0 if ($severity == 1 || $severity == 3);   # SUCCESS / INFO
         my $code = ($status >> 8) & 0xFF;

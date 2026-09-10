@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-use Test::More tests => 16;
+use Test::More tests => 20;
 
 use Lit::ShLex;
 
@@ -38,3 +38,17 @@ like($e, qr/unterminated double quote/, 'unterminated quote is an error');
 
 ($l, $e) = Lit::ShLex::parse('(a; b)');
 like($e, qr/subshell/, 'subshells are diagnosed, not mis-run');
+
+# A VMS file specification carries its version after a semicolon.  Treating
+# that as a command separator split "disk:[dir]perl.exe;1 args" in two and
+# left DCL trying to run a command called "1".
+($l, $e) = Lit::ShLex::parse('$5$dka0:[sys0.perl]perl.exe;1 helper.pl out');
+is(scalar @$l, 1, 'a VMS version number does not split the command');
+is(words('$5$dka0:[sys0.perl]perl.exe;1 helper.pl out'),
+   '$5$dka0:[sys0.perl]perl.exe;1|helper.pl|out',
+   'and stays attached to the file spec');
+
+($l, $e) = Lit::ShLex::parse('echo a; echo b');
+is(scalar @$l, 2, "a bare ';' still separates commands");
+($l, $e) = Lit::ShLex::parse('echo a ; echo b');
+is(scalar @$l, 2, 'spaced or not');

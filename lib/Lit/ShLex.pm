@@ -92,6 +92,14 @@ sub _word {
             next;
         }
 
+        # A VMS file specification carries its version after a semicolon,
+        # and that must not be mistaken for a command separator: splitting
+        # "disk:[dir]perl.exe;1" leaves DCL trying to run a command called
+        # "1".  Only a ';' that follows something already shaped like a VMS
+        # spec, and is itself followed by digits, is treated as part of the
+        # word -- "cmd1 ; cmd2" and "cmd1; cmd2" still separate as usual.
+        if ($w =~ /[:\[]/ && $$lref =~ /\G(;[0-9]+)/gc) { $w .= $1; next }
+
         last if $$lref =~ /\G(?=[ \t|&;()<>])/gc;
         if ($$lref =~ /\G([^ \t|&;()<>'"\\]+)/gcs) { $w .= $1; next }
         last;
