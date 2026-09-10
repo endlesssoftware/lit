@@ -167,14 +167,16 @@ sub _walk {
     closedir(DH);
 
     foreach my $e (@entries) {
-        next if $cfg->is_excluded($e);
-        my $full = Lit::Compat::joinp($dir, $e);
-        if (-d $full) {
+        my ($name, $is_dir) = Lit::Compat::dir_entry($e);
+        next if $cfg->is_excluded($name);
+        my $full = Lit::Compat::joinp($dir, $name);
+        $is_dir = 1 if !$is_dir && -d $full;
+        if ($is_dir) {
             _walk($full, $suite, $cfg, $cache, $tests, $errors, $lit)
                 if $cfg->recursive;
             next;
         }
-        next unless $cfg->matches_suffix($e);
+        next unless $cfg->matches_suffix($name);
         push @$tests, _make_test($full, $suite, $cfg);
     }
 }

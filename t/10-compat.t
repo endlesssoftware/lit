@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-use Test::More tests => 25;
+use Test::More tests => 30;
 
 use Lit::Compat;
 
@@ -64,3 +64,16 @@ if (Lit::Compat::IS_VMS) {
     ok(Lit::Compat::is_glob('foo*.o'), 'as is a star');
 }
 ok(!Lit::Compat::is_glob('plain.txt'), 'an ordinary name is not');
+
+# SYS$SCRATCH: is a plain logical naming a directory, not a rooted one.  Put
+# through Unix syntax it becomes /sys$scratch/, and converting back reads
+# the first component as a device - giving SYS$SCRATCH:[000000]FOO.TMP, the
+# master directory of the volume rather than the user's scratch area.  So a
+# native directory has the name appended, never joined with a slash.
+is(Lit::Compat::join_spec('SYS$SCRATCH:', 'LITOUT_1_1.TMP'),
+   'SYS$SCRATCH:LITOUT_1_1.TMP', 'a logical ending in : is appended to');
+is(Lit::Compat::join_spec('DISK$USER:[SMITH]', 'LITOUT_1_1.TMP'),
+   'DISK$USER:[SMITH]LITOUT_1_1.TMP', 'so is a directory ending in ]');
+is(Lit::Compat::join_spec('/tmp', 'x.tmp'),  '/tmp/x.tmp', 'a Unix path is joined');
+is(Lit::Compat::join_spec('/tmp/', 'x.tmp'), '/tmp/x.tmp', 'without doubling the slash');
+is(Lit::Compat::join_spec('', 'x.tmp'),      'x.tmp',      'an empty directory is dropped');

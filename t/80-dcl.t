@@ -45,14 +45,16 @@ like($multi, qr{\$ EXIT __lit_sts\n\z}, 'the procedure ends by exiting with the 
 
 # ---- single command: the pre-existing path is unchanged ------------------
 
+my $prog   = '/mmk_dir/mmk.exe';
 my $single = proc_for(
-    argv   => [ '/mmk_dir/mmk.exe', '-c', 'hello.mms' ],
+    argv   => [ $prog, '-c', 'hello.mms' ],
     stdout => '/work/out', stderr => '/work/err',
            cwd    => 'DISK$SCRATCH:[BUILD.TEST.OUTPUT]',
 );
 like($single, qr{DEFINE/USER/NOLOG SYS\$OUTPUT}, 'a single command still uses DEFINE/USER');
 unlike($single, qr{DEASSIGN}, 'and needs no deassign');
-like($single, qr{__lit_cmd := \$/mmk_dir/mmk\.exe},
+my $native = Lit::Compat::to_native($prog);
+like($single, qr{\Q__lit_cmd := \E\$\Q$native\E},
      'foreign command defined with := , which is local to the procedure');
 unlike($single, qr{__lit_cmd :==},
        'not :== , which would leave a global symbol behind');
@@ -97,18 +99,26 @@ is(scalar @$recs, 3, 'blank separators are dropped');
 is(Lit::Compat::dcl_path_problem({ cwd => 'DISK$SCRATCH:[X]' }, undef, undef),
    undef, 'a VMS directory spec is accepted');
 
-like(Lit::Compat::dcl_path_problem({ cwd => '/work' }, undef, undef),
-     qr/cannot express the working directory '\/work' in VMS syntax/,
-     'a Unix path would give "SET DEFAULT /work", which is not DCL, so it is refused');
-
-like(Lit::Compat::dcl_path_problem({ stdin => '/tmp/in' }, undef, undef),
-     qr/standard input/, 'the same check covers SYS$INPUT');
-
-like(Lit::Compat::dcl_path_problem({}, '/tmp/o.tmp', undef),
-     qr/scratch file/, 'and the scratch files interpolated into the procedure');
-
 is(Lit::Compat::dcl_path_problem({ cwd => 'X:[Y]', stderr => '&1' }, 'X:[Y]O.TMP', undef),
    undef, 'a merged stderr is not mistaken for a path');
+
+SKIP: {
+    # On OpenVMS vmspath() turns /work into WORK:[000000] quite happily, so
+    # there is nothing left for the guard to catch.  It fires only where the
+    # conversion did not happen, which off VMS is every path.
+    skip 'paths do convert on OpenVMS, so the guard has nothing to catch', 3
+        if Lit::Compat::IS_VMS;
+
+    like(Lit::Compat::dcl_path_problem({ cwd => '/work' }, undef, undef),
+         qr/cannot express the working directory '\/work' in VMS syntax/,
+         'a Unix path would give "SET DEFAULT /work", which is not DCL');
+
+    like(Lit::Compat::dcl_path_problem({ stdin => '/tmp/in' }, undef, undef),
+         qr/standard input/, 'the same check covers SYS$INPUT');
+
+    like(Lit::Compat::dcl_path_problem({}, '/tmp/o.tmp', undef),
+         qr/scratch file/, 'and the scratch files interpolated into the procedure');
+}
 
 # ---- the builtin ---------------------------------------------------------
 
@@ -170,7 +180,9 @@ SKIP: {
 
     # Built off OpenVMS the paths cannot be meaningful, so they are left
     # empty rather than baking in a Unix path that DCL could not use.
-    system($^X, 'vms/mkcom.PL', $gen, '', '');
+    # "-" rather than "": OpenVMS drops a zero-length argument entirely, so
+    # a test cannot ask for an empty one by passing "".
+    system($^X, 'vms/mkcom.PL', $gen, '-', '-');
     $com = Lit::Compat::read_file($gen);
     like($com, qr/LIT_ROOT = ""/, 'an unknown path is left empty');
     unlike($com, qr/\@LIT_(?:ROOT|PERL)\@/,

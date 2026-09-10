@@ -66,6 +66,7 @@ sub to_unix {
 sub to_native {
     my ($p) = @_;
     return $p if !defined $p || $p eq '';
+    return $p if is_native_spec($p);
     if (IS_VMS && $HAVE_FILESPEC) {
         my $v;
         eval { $v = VMS::Filespec::vmsify($p); 1 };
@@ -77,12 +78,35 @@ sub to_native {
 sub to_native_dir {
     my ($p) = @_;
     return $p if !defined $p || $p eq '';
+    return $p if is_native_spec($p);
     if (IS_VMS && $HAVE_FILESPEC) {
         my $v;
         eval { $v = VMS::Filespec::vmspath($p); 1 };
         return defined($v) && length($v) ? $v : $p;
     }
     return $p;
+}
+
+# Is this already an OpenVMS file specification?  One contains a device,
+# logical or directory delimiter and no '/'.  Converting such a spec again
+# is at best pointless and at worst destructive, so both to_native routines
+# leave it alone.
+sub is_native_spec {
+    my ($p) = @_;
+    return 0 unless IS_VMS;
+    return 0 unless defined $p && length $p;
+    return 0 if index($p, '/') >= 0;
+    return ($p =~ /[:\[<]/) ? 1 : 0;
+}
+
+# Append a file name to a directory, in whatever syntax the directory is
+# already written in.  A VMS spec ends in ':', ']' or '>' and simply has the
+# name appended; anything else is treated as a Unix path.
+sub join_spec {
+    my ($dir, $name) = @_;
+    return $name unless defined $dir && length $dir;
+    return $dir . $name if $dir =~ /[:\]>]$/;
+    return joinp($dir, $name);
 }
 
 # Join path components in Unix syntax, collapsing redundant separators.
@@ -190,15 +214,22 @@ sub temp_root {
     return $TMP_ROOT if defined $TMP_ROOT;
     my $d;
     if (IS_VMS) {
-        $d = defined $ENV{'SYS$SCRATCH'} ? to_unix($ENV{'SYS$SCRATCH'}) : undef;
-        $d = to_unix('SYS$SCRATCH:') unless defined $d && length $d;
+        # Keep this in native syntax.  SYS$SCRATCH: is a plain logical
+        # naming a directory, not a rooted one, so putting it through Unix
+        # syntax loses that: unixify() gives /sys$scratch/, and vmsify()
+        # then reads the first component as a device, producing
+        # SYS$SCRATCH:[000000]FOO.TMP - the master directory of the volume
+        # rather than the user's scratch area.
+        $d = (defined $ENV{'SYS$SCRATCH'} && length $ENV{'SYS$SCRATCH'})
+           ? $ENV{'SYS$SCRATCH'}
+           : 'SYS$SCRATCH:';
     } else {
         foreach my $k (qw(TMPDIR TEMP TMP)) {
             if (defined $ENV{$k} && length $ENV{$k} && -d $ENV{$k}) { $d = $ENV{$k}; last }
         }
         $d = '/tmp' unless defined $d;
+        $d =~ s{/+$}{};
     }
-    $d =~ s{/+$}{};
     $TMP_ROOT = $d;
     return $TMP_ROOT;
 }
@@ -211,7 +242,8 @@ sub temp_file {
     $tag = substr($tag, 0, 12);
     $dir = temp_root() unless defined $dir && length $dir;
     $TMP_SEQ++;
-    return joinp($dir, sprintf('%s_%d_%d.tmp', $tag, $$ % 100000, $TMP_SEQ));
+    return join_spec($dir,
+        sprintf('%s_%d_%d.tmp', $tag, $$ % 100000, $TMP_SEQ));
 }
 
 my @CLEANUP;
@@ -299,6 +331,24 @@ sub which {
         }
     }
     return undef;
+}
+
+# Reduce a readdir() entry to the name the rest of the code expects, and say
+# whether it is a directory.
+#
+# OpenVMS returns a subdirectory as NAME.DIR, which is neither the name we
+# want nor something -d will necessarily agree is a directory, and files may
+# carry a ;version.  Left alone, a whole subtree of tests is silently passed
+# over: NAME.DIR matches no test suffix, so nothing is reported missing.
+sub dir_entry {
+    my ($e) = @_;
+    return ($e, (-d $e ? 1 : 0)) unless IS_VMS;
+
+    my $name   = $e;
+    my $is_dir = 0;
+    $name =~ s/;\d+$//;
+    $is_dir = 1 if $name =~ s/\.dir$//i;
+    return ($name, $is_dir);
 }
 
 # ------------------------------------------------------------------ globbing
@@ -545,6 +595,50 @@ sub _child_exit {
     eval { require POSIX; POSIX::_exit($code); 1 } or CORE::exit($code);
 }
 
+# Apply an environment for the duration of one spawn, returning what has to
+# be put back.
+#
+# Never assign to %ENV wholesale.  On OpenVMS each key is a logical name, so
+# "%ENV = (...)" deletes every one of them and recreates it - and deleting a
+# logical that lives in another table fails outright with "no logical name
+# match", taking the process with it.  Apply only the difference instead,
+# and restore only what was touched.
+sub _apply_env {
+    my ($env) = @_;
+    return undef unless $env;
+
+    my %restore;
+    my %wanted;
+
+    foreach my $k (keys %$env) {
+        $wanted{$k} = 1;
+        my $new = $env->{$k};
+        my $old = exists $ENV{$k} ? $ENV{$k} : undef;
+        next if  defined $old &&  defined $new && $old eq $new;
+        next if !defined $old && !defined $new;
+        $restore{$k} = $old;
+        if (defined $new) { $ENV{$k} = $new }
+        else              { eval { delete $ENV{$k}; 1 } }
+    }
+
+    foreach my $k (keys %ENV) {
+        next if $wanted{$k};
+        $restore{$k} = $ENV{$k};
+        eval { delete $ENV{$k}; 1 };
+    }
+
+    return \%restore;
+}
+
+sub _restore_env {
+    my ($restore) = @_;
+    return unless $restore;
+    foreach my $k (keys %$restore) {
+        if (defined $restore->{$k}) { $ENV{$k} = $restore->{$k} }
+        else                        { eval { delete $ENV{$k}; 1 } }
+    }
+}
+
 # ---- OpenVMS backend -----------------------------------------------------
 #
 # VMS has no usable fork() and DCL has no redirection operators, so build a
@@ -706,14 +800,10 @@ sub _spawn_dcl {
     write_file($com, build_dcl_procedure($job, $out_tmp, $err_tmp))
         or return (127, 0, "cannot write command procedure $com");
 
-    my %saved;
-    if ($job->{env}) {
-        %saved = %ENV;
-        %ENV = %{ $job->{env} };
-    }
+    my $restore = _apply_env($job->{env});
     my $rc = system('@' . to_native($com));
     my $status = $?;
-    %ENV = %saved if $job->{env};
+    _restore_env($restore);
 
     _place_output($out_tmp, $job->{stdout}, $job->{append_out});
     _place_output($err_tmp, ($merge ? undef : $job->{stderr}), $job->{append_err})
@@ -817,16 +907,15 @@ sub _spawn_system {
     $cmd .= ' > ' . _sh_quote($out_tmp);
     $cmd .= $merge ? ' 2>&1' : ' 2> ' . _sh_quote($err_tmp);
 
-    my %saved;
     my $olddir;
-    if ($job->{env}) { %saved = %ENV; %ENV = %{ $job->{env} } }
+    my $restore = _apply_env($job->{env});
     if (defined $job->{cwd}) { $olddir = getcwd(); chdir($job->{cwd}) }
 
     system($cmd);
     my $status = $?;
 
     chdir($olddir) if defined $olddir;
-    %ENV = %saved if $job->{env};
+    _restore_env($restore);
 
     _place_output($out_tmp, $job->{stdout}, $job->{append_out});
     _place_output($err_tmp, ($merge ? undef : $job->{stderr}), $job->{append_err})

@@ -260,7 +260,7 @@ evaluated as the body of a sub receiving C<($config, $lit_config)>; it is
 ordinary Perl, so anything you can compute you can use.
 
     $config->name('mysuite');
-    $config->suffixes('.cob', '.pli');
+    $config->suffixes('.mmst');
     $config->test_source_root($config->dir);
     $config->test_exec_root($lit_config->param('build', '/build') . '/test');
 
@@ -397,7 +397,7 @@ local config file refines a directory.
 
 An OpenVMS compiler suite, invoked as
 
-    $ LIT -v --param build=DISK$SCRATCH:[BUILD] --param cics=1 [.TEST]
+    $ LIT -v --param build=DISK$SCRATCH:[BUILD] --param tool=mmk [.TEST]
 
     $config->name('mmk');
     $config->suffixes('.mmst');
@@ -414,9 +414,13 @@ An OpenVMS compiler suite, invoked as
     $config->add_substitution('%mmk',
         $lit_config->param('mmk', 'MMK_DIR:MMK.EXE'));
 
+    # Turning a parameter into a feature lets existing directives select on
+    # it without change: with this, "XFAIL: mmk" means "expected to fail
+    # under --param tool=mmk, and expected to pass otherwise".
+    $config->add_feature(lc($lit_config->param('tool', 'mms')));
+
     # vax/alpha/ia64/x86_64 are added automatically from the host, so a
     # test can say "UNSUPPORTED: vax" with no help from here.
-    $config->add_feature('have-cics') if $lit_config->param('cics', 0);
 
 =head1 SEE ALSO
 

@@ -9,5 +9,4 @@
 *.tar.gz
 *.zip
 examples/demo/_out/
-lit-convert-removed.zip
 vms/lit_define_commands.com

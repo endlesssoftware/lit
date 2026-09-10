@@ -16,5 +16,4 @@
 ^pm_to_blib$
 ^\.gitignore$
 \.zip$
-^lit-convert-removed\.zip$
 ^vms/lit_define_commands\.com$

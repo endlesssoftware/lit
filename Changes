@@ -8,5 +8,8 @@ Revision history for Perl distribution Lit
       - --output writes lit-format JSON results (last-run.json).
       - metrics builtin: record per-test values into the JSON results.
       - Fixed on OpenVMS: VMS file specs are no longer read as glob
-        patterns, and a wrapper builtin no longer holds a write handle
-        open across the command it wraps.
+        patterns; a wrapper builtin no longer holds a write handle open
+        across the command it wraps; the environment is applied as a
+        delta rather than by replacing every logical name; subdirectories
+        (NAME.DIR) are discovered; and scratch files land in SYS$SCRATCH:
+        rather than [000000] on its volume.
