@@ -1,6 +1,6 @@
 Revision history for Perl distribution Lit
 
-0.01  Unreleased
+1.00  2026-09-11
       - Initial version: portable lit and FileCheck in pure Perl.
       - Runs on OpenVMS (VAX, Alpha, I64, x86-64), Tru64 and Linux.
       - Internal shell (no /bin/sh required) with builtin commands.

@@ -10,7 +10,7 @@ require 5.006;
 use Lit::Compat ();
 
 use vars qw($VERSION @CODES %IS_FAILURE);
-$VERSION = '0.01';
+$VERSION = '1.00';
 
 # Result codes, in the order they are summarised.
 @CODES = qw(PASS FLAKYPASS XFAIL UNSUPPORTED XPASS FAIL TIMEOUT UNRESOLVED);

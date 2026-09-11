@@ -13,7 +13,7 @@ use Config ();
 use Lit::Compat ();
 
 use vars qw($VERSION);
-$VERSION = '0.01';
+$VERSION = '1.00';
 
 sub new {
     my ($class, %args) = @_;

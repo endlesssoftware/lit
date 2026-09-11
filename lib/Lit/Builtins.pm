@@ -28,7 +28,7 @@ require 5.006;
 use Lit::Compat ();
 
 use vars qw($VERSION);
-$VERSION = '0.01';
+$VERSION = '1.00';
 
 my %BUILTIN;
 

@@ -10,7 +10,7 @@ hosts where the Python originals cannot run.  Everything works on OpenVMS
 Installing
 ----------
 
-    unzip Lit-0.01.zip
+    unzip Lit-1.00.zip
     perl Makefile.PL
     make
     make test
@@ -18,7 +18,7 @@ Installing
 
 On OpenVMS:
 
-    $ UNZIP "-a" LIT-0_01.ZIP
+    $ UNZIP "-a" LIT-1_00.ZIP
     $ PERL MAKEFILE.PL
     $ MMK                          ! or MMS, or MAKE
     $ MMK TEST

@@ -15,7 +15,7 @@ use Lit::TestRunner ();
 use Lit::Test ();
 
 use vars qw($VERSION);
-$VERSION = '0.01';
+$VERSION = '1.00';
 
 sub _usage {
     return <<'USAGE';

@@ -16,7 +16,7 @@ use Lit::Compat ();
 use Lit::Pattern ();
 
 use vars qw($VERSION);
-$VERSION = '0.01';
+$VERSION = '1.00';
 
 my @DIR_TYPES = qw(LABEL NOT DAG SAME NEXT EMPTY COUNT PLAIN);
 

@@ -17,7 +17,7 @@ use Lit::ShLex ();
 use Lit::Builtins ();
 
 use vars qw($VERSION);
-$VERSION = '0.01';
+$VERSION = '1.00';
 
 # ---------------------------------------------------------------------------
 # run_list(\@list, \%shell, \%opt) -> \%result
