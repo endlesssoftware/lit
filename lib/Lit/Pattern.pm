@@ -23,7 +23,7 @@ use warnings;
 require 5.006;
 
 use vars qw($VERSION);
-$VERSION = '1.00';
+$VERSION = '1.01';
 
 my $NAME_RE  = qr/\$?[A-Za-z_][A-Za-z0-9_]*/;
 

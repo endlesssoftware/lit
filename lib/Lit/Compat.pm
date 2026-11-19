@@ -20,7 +20,7 @@ use File::Path ();
 use Cwd ();
 
 use vars qw($VERSION);
-$VERSION = '1.00';
+$VERSION = '1.01';
 
 use constant IS_VMS => ($^O eq 'VMS');
 use constant IS_WIN => ($^O eq 'MSWin32' || $^O eq 'os2' || $^O eq 'dos');

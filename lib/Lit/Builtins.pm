@@ -28,7 +28,7 @@ require 5.006;
 use Lit::Compat ();
 
 use vars qw($VERSION);
-$VERSION = '1.00';
+$VERSION = '1.01';
 
 my %BUILTIN;
 
@@ -1129,16 +1129,32 @@ $BUILTIN{'dcl'} = sub {
     my $merge = (defined $fd->{2}{file} && defined $fd->{1}{file}
                  && $fd->{2}{file} eq $fd->{1}{file}) ? 1 : 0;
 
+    # The shell has already opened the redirection targets as $ctx->{out}
+    # and $ctx->{err}.  Capture into scratch files and copy through those
+    # handles, rather than naming the targets to spawn(): RMS grants only
+    # one write accessor by default, so spawn's own open of the same file
+    # fails (RMS-E-FLK) and the output is lost.
+    my $out_cap = Lit::Compat::temp_file('litdclo');
+    my $err_cap = $merge ? undef : Lit::Compat::temp_file('litdcle');
+
     my ($code, $timedout, $err) = Lit::Compat::spawn({
         dcl        => \@a,
         stdin      => $fd->{0}{file},
-        stdout     => $fd->{1}{file},
-        stderr     => ($merge ? '&1' : $fd->{2}{file}),
-        append_out => $fd->{1}{append},
-        append_err => $fd->{2}{append},
+        stdout     => $out_cap,
+        stderr     => ($merge ? '&1' : $err_cap),
+        append_out => 0,
+        append_err => 0,
         cwd        => $ctx->{shell}{cwd},
         env        => $ctx->{shell}{env},
     });
+
+    foreach my $pair ([$out_cap, $ctx->{out}], [$err_cap, $ctx->{err}]) {
+        my ($file, $fh) = @$pair;
+        next unless defined $file;
+        my $data = Lit::Compat::read_file($file);
+        print { $fh } $data if defined $data && length $data;
+        unlink $file;
+    }
 
     if (defined $err) { print { $ctx->{err} } "dcl: $err\n"; return 127 }
     return $code;

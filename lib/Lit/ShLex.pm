@@ -18,7 +18,7 @@ use warnings;
 require 5.006;
 
 use vars qw($VERSION);
-$VERSION = '1.00';
+$VERSION = '1.01';
 
 # ------------------------------------------------------------------ tokenize
 #
