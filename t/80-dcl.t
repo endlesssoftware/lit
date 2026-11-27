@@ -188,9 +188,10 @@ SKIP: {
 
     # Built off OpenVMS the paths cannot be meaningful, so they are left
     # empty rather than baking in a Unix path that DCL could not use.
-    # "-" rather than "": OpenVMS drops a zero-length argument entirely, so
-    # a test cannot ask for an empty one by passing "".
-    system($^X, 'vms/mkcom.PL', $gen, '-', '-');
+    # "_" rather than "": OpenVMS drops a zero-length argument entirely, so
+    # a test cannot ask for an empty one by passing "".  Not "-" either:
+    # Perl 5.6 hands the line to DCL unquoted, and a trailing "-" continues it.
+    system($^X, 'vms/mkcom.PL', $gen, '_', '_');
     $com = Lit::Compat::read_file($gen);
     like($com, qr/LIT_ROOT = ""/, 'an unknown path is left empty');
     unlike($com, qr/\@LIT_(?:ROOT|PERL)\@/,

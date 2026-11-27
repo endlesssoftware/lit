@@ -21,11 +21,13 @@ $target = 'vms/lit_define_commands.com'
 
 # MakeMaker passes only the target.  The two optional arguments after it
 # let a test generate the OpenVMS-shaped procedure from any host.  A single
-# "-" means "empty": OpenVMS drops a zero-length argument entirely, so a
-# test cannot ask for one by passing "".
+# "_" (or "-") means "empty": OpenVMS drops a zero-length argument entirely,
+# so a test cannot ask for one by passing "".  "_" is the one to use there:
+# Perl 5.6 passes arguments to DCL unquoted, and a trailing "-" is DCL's
+# continuation character.
 my ($force_root, $force_perl) = @ARGV;
 foreach my $v ($force_root, $force_perl) {
-    $v = '' if defined $v && $v eq '-';
+    $v = '' if defined $v && ($v eq '_' || $v eq '-');
 }
 
 # Where EXE_FILES land, and the Perl that will run them.
