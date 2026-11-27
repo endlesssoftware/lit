@@ -20,7 +20,7 @@ use File::Path ();
 use Cwd ();
 
 use vars qw($VERSION);
-$VERSION = '1.02';
+$VERSION = '1.03';
 
 use constant IS_VMS => ($^O eq 'VMS');
 use constant IS_WIN => ($^O eq 'MSWin32' || $^O eq 'os2' || $^O eq 'dos');
@@ -56,7 +56,7 @@ sub to_unix {
     if (IS_VMS && $HAVE_FILESPEC) {
         my $u;
         eval { $u = VMS::Filespec::unixify($p); 1 };
-        return defined($u) && length($u) ? $u : $p;
+        return vms_root(defined($u) && length($u) ? $u : $p);
     }
     if (IS_WIN) { $p =~ s{\\}{/}g }
     return $p;
@@ -123,7 +123,22 @@ sub joinp {
         next unless length $q;
         $out .= ($out =~ m{/$} ? '' : '/') . $q;
     }
-    return $out;
+    return vms_root($out);
+}
+
+# A file at the top of a device or rooted logical, such as /test$/lit.cfg,
+# goes through VMS::Filespec and back.  Perl 5.6 on VAX cannot open the short
+# form, but its unixify() writes it as /test$/000000/lit.cfg, which it can;
+# later Perls open either and give back the short form.  Directories are
+# left alone: /test$/tests is fine, and /test$/000000 would name a file.
+sub vms_root {
+    my ($p) = @_;
+    return $p unless IS_VMS && $HAVE_FILESPEC;
+    return $p unless defined $p && $p =~ m{^/[^/]+/([^/]+)$};
+    return $p if lc($1) eq '000000' || -d $p;
+    my $u;
+    eval { $u = VMS::Filespec::unixify(VMS::Filespec::vmsify($p)); 1 };
+    return (defined($u) && length($u) && $u !~ m{/$}) ? $u : $p;
 }
 
 sub is_absolute {
@@ -175,7 +190,7 @@ sub clean_path {
         push @out, $seg;
     }
     my $r = $lead . join('/', @out);
-    return length($r) ? $r : ($lead ? '/' : '.');
+    return length($r) ? vms_root($r) : ($lead ? '/' : '.');
 }
 
 sub mkpath  { my ($d) = @_; File::Path::mkpath($d); return -d $d }
@@ -1067,6 +1082,7 @@ place a conversion is needed is when a filename is handed to a foreign
 command - which is what C<to_native> and C<to_native_dir> are for.
 
     to_unix($p)        native syntax -> the internal Unix form
+    vms_root($p)       /dev/file -> /dev/000000/file where Perl needs it
     to_native($p)      a file, in whatever the host's interpreter wants
     to_native_dir($p)  likewise for a directory
     joinp(@parts)      join, collapsing redundant separators

@@ -30,7 +30,7 @@ require 5.006;
 use Lit::Compat ();
 
 use vars qw($VERSION @SUITE_NAMES @LOCAL_NAMES @SITE_NAMES);
-$VERSION = '1.02';
+$VERSION = '1.03';
 
 @SITE_NAMES  = ('litsite.cfg',  'lit.site.cfg');
 @SUITE_NAMES = ('lit.cfg',      'litcfg.pl');

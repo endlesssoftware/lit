@@ -22,7 +22,7 @@ use warnings;
 require 5.006;
 
 use vars qw($VERSION);
-$VERSION = '1.02';
+$VERSION = '1.03';
 
 sub evaluate {
     my ($text, $features) = @_;

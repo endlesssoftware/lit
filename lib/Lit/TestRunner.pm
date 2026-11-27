@@ -15,7 +15,7 @@ use Lit::BoolExpr ();
 use Lit::Test ();
 
 use vars qw($VERSION);
-$VERSION = '1.02';
+$VERSION = '1.03';
 
 my $KEYWORDS = 'RUN|XFAIL|REQUIRES-ANY|REQUIRES|UNSUPPORTED|ALLOW_RETRIES|REDEFINE|DEFINE';
 

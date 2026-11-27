@@ -6,7 +6,7 @@ use warnings;
 require 5.006;
 
 use vars qw($VERSION);
-$VERSION = '1.02';
+$VERSION = '1.03';
 
 1;
 
@@ -69,7 +69,7 @@ included, where it also restores file attributes recorded by VMS Zip.
 
 On Unix, Linux and Tru64:
 
-    unzip Lit-1.02.zip
+    unzip Lit-1.03.zip
     perl Makefile.PL
     make
     make test
@@ -77,7 +77,7 @@ On Unix, Linux and Tru64:
 
 On OpenVMS:
 
-    $ UNZIP "-a" LIT-1_02.ZIP     ! -a writes text as variable-record files
+    $ UNZIP "-a" LIT-1_03.ZIP     ! -a writes text as variable-record files
     $ PERL MAKEFILE.PL
     $ MMK                         ! or MMS, or MAKE
     $ MMK TEST
