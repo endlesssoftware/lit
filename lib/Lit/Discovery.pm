@@ -18,7 +18,7 @@ use Lit::Config ();
 use Lit::Test ();
 
 use vars qw($VERSION);
-$VERSION = '1.01';
+$VERSION = '1.02';
 
 sub find_tests {
     my ($paths, $lit) = @_;

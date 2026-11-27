@@ -10,7 +10,7 @@ require 5.006;
 use Lit::Compat ();
 
 use vars qw($VERSION @CODES %IS_FAILURE);
-$VERSION = '1.01';
+$VERSION = '1.02';
 
 # Result codes, in the order they are summarised.
 @CODES = qw(PASS FLAKYPASS XFAIL UNSUPPORTED XPASS FAIL TIMEOUT UNRESOLVED);
@@ -82,10 +82,16 @@ sub exec_dir {
         Lit::Compat::joinp($root, $sub, 'Output'));
 }
 
+# %t: <exec dir>/<test file name>.tmp, or <test_file_name>_tmp where the
+# exec dir needs ODS-2 names (see ods2_names in Lit::Config).
 sub temp_base {
     my ($self) = @_;
+    my $dir  = $self->exec_dir;
     my $base = Lit::Compat::basename_of($self->{rel});
-    return Lit::Compat::joinp($self->exec_dir, $base . '.tmp');
+    my $ods2 = $self->{config}->ods2_names;
+    $ods2 = Lit::Compat::needs_ods2_names($dir) unless defined $ods2;
+    return Lit::Compat::joinp($dir, Lit::Compat::ods2_name($base . '_tmp')) if $ods2;
+    return Lit::Compat::joinp($dir, $base . '.tmp');
 }
 
 1;

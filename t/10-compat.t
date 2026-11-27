@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-use Test::More tests => 30;
+use Test::More tests => 38;
 
 use Lit::Compat;
 
@@ -75,3 +75,23 @@ is(Lit::Compat::join_spec('DISK$USER:[SMITH]', 'LITOUT_1_1.TMP'),
 is(Lit::Compat::join_spec('/tmp', 'x.tmp'),  '/tmp/x.tmp', 'a Unix path is joined');
 is(Lit::Compat::join_spec('/tmp/', 'x.tmp'), '/tmp/x.tmp', 'without doubling the slash');
 is(Lit::Compat::join_spec('', 'x.tmp'),      'x.tmp',      'an empty directory is dropped');
+
+# ODS-2 names for %t.
+use Lit::Config;
+use Lit::Test;
+is(Lit::Compat::ods2_name('words.mmst_tmp'), 'words_mmst_tmp', 'ods2_name turns dots into underscores');
+is(Lit::Compat::ods2_name('a b+c$d-e'),      'a_b_c$d-e',      'ods2_name keeps $ and -');
+my $long = Lit::Compat::ods2_name('x' x 50);
+is(length($long), 39, 'ods2_name caps a long name at 39');
+isnt($long, Lit::Compat::ods2_name(('x' x 49) . 'y'), 'two long names stay distinct');
+ok(!Lit::Compat::needs_ods2_names('/tmp'), 'no ODS-2 names off OpenVMS')
+    unless Lit::Compat::IS_VMS;
+ok(1, 'needs_ods2_names is probed on OpenVMS') if Lit::Compat::IS_VMS;
+my $cfg = Lit::Config->new(dir => '/suite');
+$cfg->test_source_root('/suite');
+my $t = Lit::Test->new(config => $cfg, rel => 'text/words.mmst', path => '/suite/text/words.mmst');
+is(Lit::Compat::basename_of($t->temp_base), 'words.mmst.tmp', '%t keeps its dots by default');
+$cfg->ods2_names(1);
+is(Lit::Compat::basename_of($t->temp_base), 'words_mmst_tmp', '%t is ODS-2 legal when asked');
+$cfg->ods2_names(0);
+is(Lit::Compat::basename_of($t->temp_base), 'words.mmst.tmp', 'and can be forced off');

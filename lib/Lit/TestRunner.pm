@@ -15,7 +15,7 @@ use Lit::BoolExpr ();
 use Lit::Test ();
 
 use vars qw($VERSION);
-$VERSION = '1.01';
+$VERSION = '1.02';
 
 my $KEYWORDS = 'RUN|XFAIL|REQUIRES-ANY|REQUIRES|UNSUPPORTED|ALLOW_RETRIES|REDEFINE|DEFINE';
 
@@ -268,7 +268,11 @@ sub _clean_temps {
     my $stem = Lit::Compat::basename_of($base);
     local *DH;
     return unless opendir(DH, $dir);
-    my @e = grep { index($_, $stem) == 0 } readdir(DH);
+    # OpenVMS file names are case-blind, and readdir may hand them back in
+    # either case.
+    my @e = Lit::Compat::IS_VMS
+          ? grep { index(lc($_), lc($stem)) == 0 } readdir(DH)
+          : grep { index($_, $stem) == 0 } readdir(DH);
     closedir(DH);
     foreach my $f (@e) {
         my $p = Lit::Compat::joinp($dir, $f);
@@ -468,6 +472,13 @@ for C<%S>).
 A scratch file base unique to this test, and the scratch directory.  Files
 matching C<%t*> are removed before each run, so a test cannot be fooled by
 its own leftovers.
+
+C<%t> is normally the test's file name plus F<.tmp>.  Where the scratch
+directory needs ODS-2 names (always on VAX; see C<ods2_names> in
+L<Lit::Config>) the dots become underscores instead, so for F<words.mmst>
+C<%t> ends in F<words_mmst_tmp> and C<%t.out> in F<words_mmst_tmp.out>.
+Write RUN: lines as C<%t.out>, C<%t.err> and the like, one suffix after
+C<%t>, and they work on both.
 
 =item %basename_s, %basename_t
 

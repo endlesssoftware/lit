@@ -20,7 +20,7 @@ use File::Path ();
 use Cwd ();
 
 use vars qw($VERSION);
-$VERSION = '1.01';
+$VERSION = '1.02';
 
 use constant IS_VMS => ($^O eq 'VMS');
 use constant IS_WIN => ($^O eq 'MSWin32' || $^O eq 'os2' || $^O eq 'dos');
@@ -244,6 +244,54 @@ sub temp_file {
     $TMP_SEQ++;
     return join_spec($dir,
         sprintf('%s_%d_%d.tmp', $tag, $$ % 100000, $TMP_SEQ));
+}
+
+# ---------------------------------------------------------------- ODS-2 names
+#
+# An ODS-2 file name has at most one dot, at most 39 characters either side
+# of it, and only A-Z 0-9 $ _ -.  VAX has no ODS-5 at all.  Names lit builds
+# from a test's own file name break those rules: %t is "<test>.tmp", and RUN:
+# lines append more (%t.out is words.mmst.tmp.out).  Where the scratch
+# directory cannot hold such names, %t is built with ods2_name() instead
+# (words_mmst_tmp, so %t.out is words_mmst_tmp.out).
+
+my $IS_VAX = (lc(join(' ', grep { defined } $Config::Config{archname},
+                                            $Config::Config{myarchname})) =~ /vax/) ? 1 : 0;
+
+sub is_vax { return (IS_VMS && $IS_VAX) ? 1 : 0 }
+
+# Make one name component ODS-2 legal: every character outside A-Z 0-9 $ _ -
+# (dots included) becomes '_', and anything over 39 characters is cut to 30
+# plus '_' and an 8-digit checksum, so two long names stay distinct.
+sub ods2_name {
+    my ($name) = @_;
+    $name =~ s/[^A-Za-z0-9\$_-]/_/g;
+    if (length($name) > 39) {
+        my $sum = unpack('%32C*', $name);
+        $name = substr($name, 0, 30) . '_' . sprintf('%08x', $sum);
+    }
+    return $name;
+}
+
+# Must names created under $dir be ODS-2 legal?  Always on VAX; elsewhere on
+# OpenVMS, try to create a name with two dots in the nearest existing
+# directory and see.  The answer is cached per volume (the path's first
+# component), so it costs one file create per volume per run.
+my %ODS2_CACHE;
+sub needs_ods2_names {
+    my ($dir) = @_;
+    return 0 unless IS_VMS;
+    return 1 if $IS_VAX;
+    my $d = (defined $dir && length $dir) ? $dir : '.';
+    while ($d ne '/' && $d ne '.' && !-d $d) { $d = dirname_of($d) }
+    my $key = ($d =~ m{^(/[^/]+)}) ? lc($1) : lc($d);
+    return $ODS2_CACHE{$key} if exists $ODS2_CACHE{$key};
+    my $probe = joinp($d, sprintf('lit_ods_probe_%d.a.b', $$ % 100000));
+    local *FH;
+    my $ok = open(FH, '>', $probe) ? 1 : 0;
+    if ($ok) { close(FH); 1 while unlink($probe) }
+    $ODS2_CACHE{$key} = $ok ? 0 : 1;
+    return $ODS2_CACHE{$key};
 }
 
 # A scratch *directory*, in Unix syntax, created and ready to use.

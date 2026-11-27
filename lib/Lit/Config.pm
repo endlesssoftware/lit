@@ -30,7 +30,7 @@ require 5.006;
 use Lit::Compat ();
 
 use vars qw($VERSION @SUITE_NAMES @LOCAL_NAMES @SITE_NAMES);
-$VERSION = '1.01';
+$VERSION = '1.02';
 
 @SITE_NAMES  = ('litsite.cfg',  'lit.site.cfg');
 @SUITE_NAMES = ('lit.cfg',      'litcfg.pl');
@@ -53,6 +53,7 @@ sub new {
         pipefail         => 1,
         timeout          => 0,
         recursive        => 1,
+        ods2_names       => undef,
     };
     return bless $self, $class;
 }
@@ -87,6 +88,7 @@ sub unsupported      { my $s = shift; return $s->_slot('unsupported', @_) }
 sub pipefail         { my $s = shift; return $s->_slot('pipefail', @_) }
 sub timeout          { my $s = shift; return $s->_slot('timeout', @_) }
 sub recursive        { my $s = shift; return $s->_slot('recursive', @_) }
+sub ods2_names       { my $s = shift; return $s->_slot('ods2_names', @_) }
 
 # ---------------------------------------------------------------- suffixes
 
@@ -395,6 +397,16 @@ report only the last stage's status.
 
 Per-test time limit.  This needs a real C<fork()>, so it is inert on
 OpenVMS; leave it unset there rather than have it silently ignored.
+
+=item ods2_names([$bool])
+
+Whether C<%t> is built to be legal on an ODS-2 disk.  ODS-2 allows one dot
+per file name, so the usual F<words.mmst.tmp> (and F<words.mmst.tmp.out>
+from C<%t.out>) cannot be created there; with this set, C<%t> is
+F<words_mmst_tmp> instead, and C<%t.out> is F<words_mmst_tmp.out>.  Left
+undefined, the default, lit decides: always on VAX, which has no ODS-5;
+elsewhere on OpenVMS by trying to create a two-dot name in the scratch
+directory; never on other hosts.  Set it true or false to override that.
 
 =item clone([$dir])
 

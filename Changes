@@ -1,5 +1,11 @@
 Revision history for Perl distribution Lit
 
+1.02  2026-11-27
+      - %t is ODS-2 legal where it has to be: on VAX, and on OpenVMS when
+        the scratch directory is on an ODS-2 disk, %t is <test>_<ext>_tmp
+        rather than <test>.<ext>.tmp, so %t.out and the like can be created.
+        $config->ods2_names(1 or 0) overrides the check.
+
 1.01  2026-11-20
       - dcl builtin: no longer loses output redirected to a file on OpenVMS
         (RMS-E-FLK); output is captured to scratch files and copied through
