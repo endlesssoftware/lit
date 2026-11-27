@@ -7,6 +7,10 @@ use Lit::ShRun;
 
 # The generated command procedure is the one part of the OpenVMS path that
 # can be checked without OpenVMS, so check it thoroughly.
+#
+# Line ends are matched with (?=\n|\z) rather than $: Perl 5.8.6 misreads a
+# $ just before the closing delimiter of qr{...}m (and of m/...$/m), so the
+# usual spelling fails there even though the line is present.
 
 sub proc_for {
     my (%job) = @_;
@@ -34,8 +38,8 @@ unlike($multi, qr{DEASSIGN SYS\$ERROR}, 'a merged stderr needs no deassign');
 
 # Both lines must land in ONE procedure: a DCL symbol is local to the
 # procedure that defines it.
-like($multi, qr{^\$ mmk := \$DISK:\[MMK\]MMK\.EXE$}m, 'the symbol definition is present');
-like($multi, qr{^\$ mmk/extended_syntax/description=x\.mms all$}m,
+like($multi, qr{^\$ mmk := \$DISK:\[MMK\]MMK\.EXE(?=\n|\z)}m, 'the symbol definition is present');
+like($multi, qr{^\$ mmk/extended_syntax/description=x\.mms all(?=\n|\z)}m,
      'and the build line follows it verbatim, qualifiers intact');
 like($multi, qr{mmk :=.*mmk/extended_syntax}s, 'in that order, in the same procedure');
 
@@ -66,9 +70,9 @@ like($single, qr{__lit_cmd "-c" "hello\.mms"}, 'arguments quoted to preserve cas
 # later commands run against a broken state.
 for my $p ([multi => $multi], [single => $single]) {
     my ($what, $text) = @$p;
-    like($text, qr{^\$ ON WARNING THEN GOTO __lit_done$}m,
+    like($text, qr{^\$ ON WARNING THEN GOTO __lit_done(?=\n|\z)}m,
          "$what: a failure jumps to the cleanup label");
-    like($text, qr{^\$ __lit_done:\n\$ __lit_sts = \$STATUS$}m,
+    like($text, qr{^\$ __lit_done:\n\$ __lit_sts = \$STATUS(?=\n|\z)}m,
          "$what: \$STATUS is captured first, before SET NOON could clobber it");
     like($text, qr{__lit_sts = \$STATUS\n\$ SET NOON},
          "$what: cleanup itself cannot be cut short");
@@ -178,7 +182,7 @@ SKIP: {
          'the install directory is baked in');
     like($com, qr/LIT_PERL = "DISK\$TOOLS:\[PERL\]PERL\.EXE"/i,
          'as is the Perl image');
-    like($com, qr/^\$ LIT       :== \$'LIT_PERL' 'LIT_ROOT'LIT\.PL$/m,
+    like($com, qr/^\$ LIT       :== \$'LIT_PERL' 'LIT_ROOT'LIT\.PL(?=\n|\z)/m,
          'LIT is defined as a foreign command');
     unlink $gen;
 

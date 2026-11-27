@@ -28,7 +28,7 @@ require 5.006;
 use Lit::Compat ();
 
 use vars qw($VERSION);
-$VERSION = '1.03';
+$VERSION = '1.04';
 
 my %BUILTIN;
 
@@ -393,11 +393,8 @@ sub _copy_tree {
     my ($src, $dst) = @_;
     if (-d $src) {
         Lit::Compat::mkpath($dst) unless -d $dst;
-        local *DH;
-        opendir(DH, $src) or return 0;
-        my @e = grep { $_ ne '.' && $_ ne '..' } readdir(DH);
-        closedir(DH);
-        foreach my $e (@e) {
+        my $e = Lit::Compat::read_dir($src) or return 0;
+        foreach my $e (@$e) {
             return 0 unless _copy_tree(Lit::Compat::joinp($src, $e),
                                        Lit::Compat::joinp($dst, $e));
         }

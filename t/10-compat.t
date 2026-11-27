@@ -90,7 +90,10 @@ ok(1, 'needs_ods2_names is probed on OpenVMS') if Lit::Compat::IS_VMS;
 my $cfg = Lit::Config->new(dir => '/suite');
 $cfg->test_source_root('/suite');
 my $t = Lit::Test->new(config => $cfg, rel => 'text/words.mmst', path => '/suite/text/words.mmst');
-is(Lit::Compat::basename_of($t->temp_base), 'words.mmst.tmp', '%t keeps its dots by default');
+# The default probes the disk, and an ODS-2 build area on OpenVMS rightly
+# says no to dots, so the plain form is asked for explicitly.
+$cfg->ods2_names(0);
+is(Lit::Compat::basename_of($t->temp_base), 'words.mmst.tmp', '%t keeps its dots when ODS-2 names are off');
 $cfg->ods2_names(1);
 is(Lit::Compat::basename_of($t->temp_base), 'words_mmst_tmp', '%t is ODS-2 legal when asked');
 $cfg->ods2_names(0);

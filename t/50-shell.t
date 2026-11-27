@@ -110,10 +110,25 @@ rc_is ('FileCheck builtin fails',
 out_is('subprocess stdout', "$PERL $HELP out",               "to-stdout\n");
 out_is('stderr stays separate',
        "$PERL $HELP both 2> e1",                             "to-stdout\n");
-out_is('2>&1 merges',      "$PERL $HELP err 2>&1",           "to-stderr\n");
-rc_is ('exit code propagates', "$PERL $HELP exit 3",         3);
+# Perl before 5.8.9 on OpenVMS has no ${^CHILD_ERROR_NATIVE}, and its $?
+# keeps only success or failure: exit 3 reads as 0, and a missing verb as
+# 256.  Nor does a Perl child's stderr reach a merged SYS$OUTPUT there.
+my $OLD_VMS = Lit::Compat::IS_VMS && !defined(eval { ${^CHILD_ERROR_NATIVE} });
+TODO: {
+    local $TODO = 'stderr of a Perl child is lost in a 2>&1 merge on OpenVMS Perl < 5.8.9'
+        if $OLD_VMS;
+    out_is('2>&1 merges',      "$PERL $HELP err 2>&1",           "to-stderr\n");
+}
+SKIP: {
+    skip 'exit codes other than success/failure need ${^CHILD_ERROR_NATIVE} (Perl 5.8.9)', 1
+        if $OLD_VMS;
+    rc_is ('exit code propagates', "$PERL $HELP exit 3",         3);
+}
 out_is('env sets a variable',  "env FOO=bar $PERL $HELP env FOO", "bar\n");
-rc_is ('command not found', 'no_such_program_xyz_12345',     127);
+SKIP: {
+    skip 'command not found needs ${^CHILD_ERROR_NATIVE} (Perl 5.8.9)', 1 if $OLD_VMS;
+    rc_is ('command not found', 'no_such_program_xyz_12345',     127);
+}
 
 
 # A wrapper builtin must not keep the redirection targets open while the

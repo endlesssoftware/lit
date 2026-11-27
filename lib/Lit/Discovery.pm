@@ -18,7 +18,7 @@ use Lit::Config ();
 use Lit::Test ();
 
 use vars qw($VERSION);
-$VERSION = '1.03';
+$VERSION = '1.04';
 
 sub find_tests {
     my ($paths, $lit) = @_;
@@ -158,15 +158,13 @@ sub _walk {
     return unless defined $cfg;
     return if $cfg->unsupported;
 
-    local *DH;
-    unless (opendir(DH, $dir)) {
+    my $entries = Lit::Compat::read_dir($dir);
+    unless ($entries) {
         push @$errors, "cannot read directory '$dir': $!";
         return;
     }
-    my @entries = sort grep { $_ ne '.' && $_ ne '..' } readdir(DH);
-    closedir(DH);
 
-    foreach my $e (@entries) {
+    foreach my $e (@$entries) {
         my ($name, $is_dir) = Lit::Compat::dir_entry($e);
         next if $cfg->is_excluded($name);
         my $full = Lit::Compat::joinp($dir, $name);

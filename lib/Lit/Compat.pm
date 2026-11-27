@@ -20,7 +20,7 @@ use File::Path ();
 use Cwd ();
 
 use vars qw($VERSION);
-$VERSION = '1.03';
+$VERSION = '1.04';
 
 use constant IS_VMS => ($^O eq 'VMS');
 use constant IS_WIN => ($^O eq 'MSWin32' || $^O eq 'os2' || $^O eq 'dos');
@@ -126,19 +126,23 @@ sub joinp {
     return vms_root($out);
 }
 
-# A file at the top of a device or rooted logical, such as /test$/lit.cfg,
-# goes through VMS::Filespec and back.  Perl 5.6 on VAX cannot open the short
-# form, but its unixify() writes it as /test$/000000/lit.cfg, which it can;
-# later Perls open either and give back the short form.  Directories are
-# left alone: /test$/tests is fine, and /test$/000000 would name a file.
+# A file at the top of a device or rooted logical, such as /test$/lit.cfg.
+# Perl 5.6 on VAX (and 5.8 elsewhere) cannot open the short form, though it
+# can open the long one its unixify() writes, /test$/000000/lit.cfg.  The
+# long form is used only when the short one is not there and the long one
+# is, so every other path - a directory, a file yet to be made, a name that
+# merely looks like /x/y - is left exactly as it was.
 sub vms_root {
     my ($p) = @_;
     return $p unless IS_VMS && $HAVE_FILESPEC;
-    return $p unless defined $p && $p =~ m{^/[^/]+/([^/]+)$};
-    return $p if lc($1) eq '000000' || -d $p;
+    return $p unless defined $p && $p =~ m{^/([^/]+)/([^/]+)$};
+    my ($dev, $name) = ($1, $2);
+    return $p if lc($name) eq '000000' || -e $p;
     my $u;
     eval { $u = VMS::Filespec::unixify(VMS::Filespec::vmsify($p)); 1 };
-    return (defined($u) && length($u) && $u !~ m{/$}) ? $u : $p;
+    # Only the same file, one level down in the master directory.
+    return $p unless defined $u && $u =~ m{^/\Q$dev\E/000000/\Q$name\E$}i;
+    return -e $u ? $u : $p;
 }
 
 sub is_absolute {
@@ -370,13 +374,22 @@ sub exit_code_from_status {
     if ($status == -1) { return 127 }
 
     if (IS_VMS) {
-        my $native = $status;
-        # ${^CHILD_ERROR_NATIVE} is more faithful when available.
+        # ${^CHILD_ERROR_NATIVE} is more faithful when available: $? alone
+        # reads 0 for exit(3), an odd and so successful severity.  Perl
+        # before 5.8.9 has none, and its $? is already in Unix form (0, or
+        # n << 8), so decode it as such: reading it as a VMS condition would
+        # make even a clean exit a warning.
+        my $n;
         {
             no strict 'refs';
-            my $n = eval { ${^CHILD_ERROR_NATIVE} };
-            $native = $n if defined $n && $n != 0;
+            $n = eval { ${^CHILD_ERROR_NATIVE} };
         }
+        unless (defined $n) {
+            return 0 if $status == 0;
+            my $code = ($status >> 8) & 0xFF;
+            return $code ? $code : 1;
+        }
+        my $native = $n != 0 ? $n : $status;
         # A CRTL program built for POSIX exit encodes the code in a
         # 0x35A000-based status.
         if (($native & 0xFFF0000) == 0x35A0000) {
@@ -465,6 +478,22 @@ sub dir_entry {
     return ($name, $is_dir);
 }
 
+# The entries of a directory, without . and .., sorted.  On a volume that
+# does not keep case (ODS-2, and everything on VAX) the names are lowercased:
+# Perl 5.8 and earlier did this anyway, but later Perls hand back the
+# uppercase the volume stores, which would make test names and results
+# depend on the Perl version and the disk.  Returns undef if the directory
+# cannot be opened ($! says why).
+sub read_dir {
+    my ($dir) = @_;
+    local *DH;
+    opendir(DH, $dir) or return undef;
+    my @e = grep { $_ ne '.' && $_ ne '..' } readdir(DH);
+    closedir(DH);
+    @e = map { lc } @e if IS_VMS && needs_ods2_names($dir);
+    return [ sort @e ];
+}
+
 # ------------------------------------------------------------------ globbing
 
 # Does this word need globbing at all?
@@ -527,11 +556,8 @@ sub _glob_unix {
         }
         my $re = _glob_to_re($seg);
         foreach my $d (@cur) {
-            local *DH;
-            opendir(DH, $d) or next;
-            my @ents = sort grep { $_ ne '.' && $_ ne '..' } readdir(DH);
-            closedir(DH);
-            foreach my $e (@ents) {
+            my $ents = read_dir($d) or next;
+            foreach my $e (@$ents) {
                 next if $e =~ /^\./ && $seg !~ /^\./;
                 push @next, joinp($d, $e) if $e =~ $re;
             }
@@ -1082,6 +1108,7 @@ place a conversion is needed is when a filename is handed to a foreign
 command - which is what C<to_native> and C<to_native_dir> are for.
 
     to_unix($p)        native syntax -> the internal Unix form
+    read_dir($d)       sorted entries; lowercased on ODS-2
     vms_root($p)       /dev/file -> /dev/000000/file where Perl needs it
     to_native($p)      a file, in whatever the host's interpreter wants
     to_native_dir($p)  likewise for a directory

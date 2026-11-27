@@ -1,5 +1,16 @@
 Revision history for Perl distribution Lit
 
+1.04  2026-11-28
+      - OpenVMS: names read from a volume that does not keep case (ODS-2,
+        and every VAX disk) are lowercased, so test names and results are
+        the same whichever Perl reads them.
+      - OpenVMS: the /dev/000000/file form from 1.03 is used only where the
+        short form cannot be opened and the long form can; other paths are
+        left alone.
+      - OpenVMS: exit statuses are decoded correctly on Perl before 5.8.9,
+        which has no ${^CHILD_ERROR_NATIVE}.
+      - Tests: no longer assume an ODS-5 work disk or Perl 5.8.9 or later.
+
 1.03  2026-11-27
       - OpenVMS: a file at the top of a device or rooted logical, such as
         TEST$:lit.cfg, is written /test$/000000/lit.cfg where Perl needs
